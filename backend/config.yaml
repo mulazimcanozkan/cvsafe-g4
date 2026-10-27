@@ -1,0 +1,77 @@
+# CVSAFE site configuration.
+# Zones are polygons in normalised image coordinates (0..1, origin top-left).
+# Zone editing belongs to the web portal; the mobile app only reads this.
+
+site:
+  id: yildiz-tower
+  name: Yildiz Tower
+  block: Zone B
+
+subcontractors:
+  - id: anka
+    name: Anka Celik Yapi
+    trade: Steel Erection
+    workers: 52
+  - id: demir
+    name: Demir Beton A.S.
+    trade: Formwork & Casting
+    workers: 34
+  - id: kaya
+    name: Kaya Harfiyat
+    trade: Heavy Excavation
+    workers: 18
+  - id: ozkan
+    name: Ozkan Iskele Yapi San.
+    trade: Scaffolding
+    workers: 22
+
+cameras:
+  - id: CAM-01
+    name: Excavation Pit East
+    # source: rtsp://user:pass@192.168.1.21:554/stream1   # real IP camera
+    source: null            # null = no live stream; uploads can still be assigned here
+    subcontractor: kaya
+    zones:
+      - id: pit-edge
+        name: Deep Trench Perimeter
+        type: restricted
+        polygon: [[0.05, 0.55], [0.95, 0.55], [0.95, 0.98], [0.05, 0.98]]
+  - id: CAM-02
+    name: South Facade Scaffolding
+    source: null
+    subcontractor: ozkan
+    zones:
+      - id: scaffold-l4
+        name: Scaffold Level 4
+        type: height          # harness required inside this zone
+        polygon: [[0.0, 0.0], [1.0, 0.0], [1.0, 0.6], [0.0, 0.6]]
+  - id: CAM-03
+    name: Tower Crane Radius
+    source: null
+    subcontractor: demir
+    zones:
+      - id: crane-2
+        name: Crane 2 Hook Radius
+        type: restricted
+        polygon: [[0.30, 0.35], [0.75, 0.35], [0.85, 0.85], [0.20, 0.85]]
+  - id: CAM-04
+    name: South Perimeter / Crane Hoist
+    source: null
+    subcontractor: anka
+    zones: []
+
+detection:
+  # Optional trained PPE model (see training/). If the file is missing the
+  # service falls back to a colour-based baseline for hard hat / hi-vis vest.
+  ppe_model: weights/ppe.pt
+  pose_model: weights/yolo11n-pose.pt
+  object_model: weights/yolo11n.pt     # COCO: used for vehicles / machinery
+  person_conf: 0.40
+  ppe_conf: 0.40
+  imgsz: 640
+  blur_faces: true                     # KVKK: faces are blurred in every stored image
+  proximity_ratio: 0.6                 # person-to-vehicle gap / person height
+  video:
+    sample_fps: 3
+    min_frames: 3                       # violation must persist this many sampled frames
+    max_seconds: 180

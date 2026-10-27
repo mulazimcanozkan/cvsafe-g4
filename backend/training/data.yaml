@@ -1,0 +1,14 @@
+# Example dataset definition - edit paths to where you unzip the dataset.
+path: ../datasets/construction-ppe
+train: train/images
+val: valid/images
+test: test/images
+
+names:
+  0: Hardhat
+  1: NO-Hardhat
+  2: Safety Vest
+  3: NO-Safety Vest
+  4: Person
+  5: machinery
+  6: harness
