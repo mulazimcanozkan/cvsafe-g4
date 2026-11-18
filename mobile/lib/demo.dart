@@ -1,4 +1,4 @@
-import 'models.dart';
+import 'package:cvsafe_core/cvsafe_core.dart';
 
 /// Offline sample data so the app can be shown without a running server.
 /// AI scanning is disabled in this mode.

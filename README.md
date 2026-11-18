@@ -1,22 +1,23 @@
-# CVSAFE – Şantiye İş Güvenliği ve Otonom İhlal Tespit Asistanı
+# CVSAFE – Construction Site Occupational Safety & Autonomous Violation Detection Assistant
 
-Proje iki parçadan oluşur:
+The project consists of four modules:
 
-| Klasör | Ne yapar | Teknoloji |
+| Folder | Purpose | Technology |
 | --- | --- | --- |
-| `backend/` | Yapay zekâ sunucusu: fotoğraf/video/kamera analizi, uyarılar, istatistik, PDF rapor | Python, FastAPI, YOLO11 (Ultralytics), OpenCV, SQLite |
-| `mobile/` | Saha uygulaması (`lib/main.dart`) **ve** web paneli (`lib/main_panel.dart`) | Flutter (Android, iOS, Web) |
+| `backend/` | AI server: image/video/stream analysis, incident workflow, analytics, PDF reports | Python, FastAPI, YOLO11 (Ultralytics), OpenCV, SQLite |
+| `packages/cvsafe_core/` | Shared client core: domain models, HTTP API client, industrial theme, common widgets | Dart / Flutter package |
+| `mobile/` | Field mobile application (`lib/main.dart`) for site managers | Flutter (Android, iOS, Web) |
+| `web_panel/` | Desktop browser management panel (`lib/main.dart`) for administrators and OHS specialists | Flutter Web, Riverpod (`flutter_riverpod`), `go_router` |
 
-- **Mobil uygulama** sahadaki şantiye şefi içindir: uyarıyı alır, kanıtı görür, müdahaleyi kaydeder ve fotoğraf/video analiz ettirir.
-- **Web paneli** ofisteki yönetici ve İSG uzmanı içindir: kamera ekler, tehlikeli bölgeleri fareyle çizer, taşeron ve kullanıcıları yönetir, olay kayıtlarını ve raporları inceler.
-
-İkisi aynı Flutter projesindedir ve aynı kodu (modeller, API, tema) paylaşır.
+- **Mobile app (`mobile/`)** is built for field site managers: receives real-time alerts, views annotated/raw evidence, logs field actions, and runs on-demand AI photo/video scans.
+- **Web panel (`web_panel/`)** is built for office administrators and OHS specialists: manages cameras, draws polygonal danger/height zones interactively, manages subcontractors and users, inspects incidents with false-alarm reason codes, and exports analytics/PDF reports.
+- **Shared core (`packages/cvsafe_core/`)** provides strongly typed models, `ApiClient`, theme tokens, and reusable UI components shared across both Flutter applications.
 
 ---
 
-## 1. Yapay zekâ sunucusunu çalıştırma
+## 1. Running the AI Backend Server
 
-Gereken: Python 3.10 veya üstü.
+Requirement: Python 3.10 or newer.
 
 ```bash
 cd backend
@@ -25,7 +26,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Sunucuyu başlatın (`CVSAFE_DEMO=1` boş bir panel yerine örnek bir haftalık geçmiş oluşturur):
+Start the server (`CVSAFE_DEMO=1` seeds a sample 7-day incident history instead of an empty database):
 
 ```bash
 # macOS / Linux
@@ -34,30 +35,30 @@ CVSAFE_DEMO=1 uvicorn app.main:app --host 0.0.0.0 --port 8000
 $env:CVSAFE_DEMO="1"; uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Kontrol: tarayıcıda `http://localhost:8000/docs` açılırsa sunucu çalışıyor demektir. Bu sayfadan her API'yi deneyebilirsiniz.
+Verify: open `http://localhost:8000/docs` in your browser to inspect and test the interactive OpenAPI documentation.
 
-### Kullanıcılar ve giriş
-İlk çalıştırmada sunucu bir yönetici hesabı oluşturur: **admin / cvsafe123**. İlk girişten sonra bu şifreyi web panelindeki **Users** sayfasından değiştirin.
-`CVSAFE_DEMO=1` ile başlatılırsa iki deneme hesabı daha oluşur: **isg / cvsafe123** (İSG uzmanı) ve **saha / cvsafe123** (saha şefi).
+### Users and Sign-In
+On first startup, the server creates a default administrator account: **admin / cvsafe123**. Change this password from the **Users** page in the web panel after signing in.
+When started with `CVSAFE_DEMO=1`, two additional demo accounts are seeded: **isg / cvsafe123** (OHS Specialist) and **saha / cvsafe123** (Site Manager).
 
-| Rol | Yapabildikleri |
+| Role | Permissions |
 | --- | --- |
-| Administrator | Her şey: kamera ekleme/silme, kullanıcı yönetimi |
-| OHS Specialist | Bölge çizme, taşeron yönetimi, olaylar, raporlar |
-| Site Manager | Uyarıları görme ve yanıtlama, AI Scan, istatistikler |
+| Administrator | Full access: camera CRUD, zone editor, subcontractor & user management (create, role/name update, activate/deactivate, password reset) |
+| OHS Specialist | Camera zone drawing, subcontractor management, incident review & actions, analytics & PDF reports |
+| Site Manager | Viewing and responding to alerts, field actions, AI Scan, analytics |
 
-### Kamera bağlama
-Web panelinde **Cameras & Zones > Add Camera** ile kamera ekleyin. **Stream source** alanına RTSP adresi yazın:
+### Connecting a Camera
+In the web panel, open **Cameras & Zones > Add Camera** and enter an RTSP stream URL in **Stream source**:
 
 ```
-rtsp://kullanici:sifre@192.168.1.21:554/stream1
+rtsp://user:password@192.168.1.21:554/stream1
 ```
 
-Gerçek kamera yoksa bir video dosyasının yolunu da yazabilirsiniz (`C:/videolar/santiye.mp4`). Dosya döngüyle kamera gibi oynatılır; canlı görüntü ve otomatik uyarılar oluşur.
-`config.yaml` artık yalnızca ilk çalıştırmada başlangıç verisi olarak okunur; sonraki değişiklikler panelden yapılır ve veritabanında saklanır.
+If no physical IP camera is available, you can enter a local video file path (`C:/videos/site.mp4`). The file loops continuously like a live feed, generating live frames and automatic violation alerts.
+`config.yaml` is read only once as initial seed data; subsequent changes made through the web panel are persisted in SQLite.
 
-### Testler
-`backend/tests/samples/` klasörüne insan içeren iki fotoğraf koyun: `people.jpg` ve `street.jpg`. Ardından:
+### Backend Tests
+To run the full test suite (including end-to-end YOLO image/video tests), place two sample images containing people (`people.jpg` and `street.jpg`) in `backend/tests/samples/`, then run:
 
 ```bash
 pytest -q tests
@@ -65,11 +66,12 @@ pytest -q tests
 
 ---
 
-## 2. Flutter uygulamasını çalıştırma
+## 2. Running the Flutter Applications
 
-Gereken: Flutter SDK 3.22 veya üstü (`flutter doctor` temiz olmalı).
+Requirement: Flutter SDK 3.22 or newer (`flutter doctor` should report no issues).
 
-İlk kurulumda platform klasörlerini (android/ios/web) oluşturup kamera ve ağ izinlerini ekleyen betiği **bir kez** çalıştırın:
+### 2.1 Field Mobile App (`mobile/`)
+On first setup, run the platform bootstrap script **once** to generate platform folders and configure camera/network permissions:
 
 ```bash
 cd mobile
@@ -77,93 +79,93 @@ bash setup.sh                                          # macOS / Linux
 powershell -ExecutionPolicy Bypass -File setup.ps1     # Windows
 ```
 
-Sonra:
+Then launch the mobile app:
 
 ```bash
 flutter run
 ```
 
-### Uygulamayı sunucuya bağlama
-Uygulamada sağ üstteki profil simgesine dokunup sunucu adresini girin:
+Tap the profile icon in the top-right corner to configure the server URL:
 
-- **Android emülatörü:** `http://10.0.2.2:8000` (varsayılan)
-- **Gerçek telefon:** `http://<bilgisayarın yerel IP'si>:8000`. Telefon ve bilgisayar aynı Wi-Fi ağında olmalı. IP'yi Windows'ta `ipconfig`, macOS/Linux'ta `ifconfig` ile bulabilirsiniz. Windows güvenlik duvarı 8000 portunu sorabilir; izin verin.
-- **Web:** `flutter run -d chrome` ve adres `http://localhost:8000`
+- **Android emulator:** `http://10.0.2.2:8000` (default)
+- **Physical phone:** `http://<computer-lan-ip>:8000` (phone and computer must be on the same Wi-Fi network)
+- **Web:** `flutter run -d chrome` with `http://localhost:8000`
 
-Sunucuya ulaşırsa giriş ekranı açılır; kullanıcı adı ve şifreyle girin. Sunucuya ulaşamazsa uygulama demo verilerle açılır ve üstte sarı bir uyarı görünür. AI Scan için sunucu bağlantısı şarttır.
+If the backend is reachable, the sign-in screen opens; otherwise, the mobile app falls back to offline demo mode with a banner indicator.
 
-### Web panelini çalıştırma
-Aynı `mobile` klasöründe, ayrı bir PowerShell penceresinde:
+### 2.2 Management Web Panel (`web_panel/`)
+In a separate terminal, run the standalone web panel application:
 
 ```bash
-flutter run -d chrome -t lib/main_panel.dart
+cd web_panel
+flutter pub get
+flutter run -d chrome
 ```
 
-Giriş ekranında sunucu adresi `http://localhost:8000` olmalı.
+Sign in with server URL `http://localhost:8000` (e.g., `admin` / `cvsafe123`).
 
-| Sayfa | İçerik |
+| Route / Page | Description |
 | --- | --- |
-| **Dashboard** | Uyum endeksi, açık uyarılar, zaman içinde ihlal grafiği, ihlal türü ve kamera dağılımı, kamera durumu |
-| **Incidents** | Tüm olaylar; durum, tür ve kamera filtresi. Satıra tıklayınca kanıt görüntüsü, zaman çizelgesi ve müdahale butonları açılır. |
-| **Cameras & Zones** | Kamera ekleme/düzenleme. **Zones** butonuyla kamera görüntüsü üzerine fareyle köşe köşe bölge çizilir. Canlı yayın yoksa bir referans fotoğraf yüklenir. |
-| **Subcontractors** | Taşeron firmalar ve sorumlu oldukları kameralar |
-| **Reports** | Dönem özeti tabloları ve PDF rapor |
-| **Users** | Kullanıcı ekleme, şifre sıfırlama, silme (sadece admin) |
+| **Dashboard** (`/dashboard`) | Compliance index, open alerts, hourly/daily violation trend chart, breakdown by violation type and camera, live camera health table |
+| **Incidents** (`/incidents`, `/incidents/:id`) | Filterable incident log (status, violation type, camera, severity, search). Clicking a row opens the detail modal with AI/raw face-blurred evidence toggle, audit timeline, **Acknowledge**, **False Alarm** (with mandatory reason code & note), and field action chips |
+| **Cameras & Zones** (`/cameras`, `/cameras/:id/zones`) | Camera management and live snapshots. **Zones** opens the interactive polygon editor supporting point-by-point drawing, corner dragging on existing zones, reference photo upload, and unsaved-changes protection |
+| **Subcontractors** (`/subcontractors`) | Subcontractor registry, violation counters, and assigned camera mapping |
+| **Reports** (`/reports`) | Period summary KPIs, subcontractor & camera breakdown tables, and one-click PDF report export |
+| **Users** (`/users`) | Role-guarded administrator view: create users, edit display name/role, activate/deactivate accounts (`is_active`), reset passwords, and delete users (enforcing last-active-admin protection) |
 
 ---
 
-## 3. Ekranlar
+## 3. Mobile Screens
 
-| Ekran | İçerik |
+| Screen | Description |
 | --- | --- |
-| **Alerts** | Açık uyarılar (5 sn'de bir güncellenir), filtreler (Kritik / KKD / Bölge / Çözülen), "Acknowledged", "False Alarm", siren/anons/uyarı kaydı. Yeni uyarı gelince titreşim ve bildirim bandı çıkar. |
-| **Evidence** | Seçili olayın kanıt görüntüsü (işaretli / ham-bulanık), taşeron, bölge, takip numarası, ilgili mevzuat, müdahale butonları ve zaman çizelgesi |
-| **AI Scan** | Fotoğraf çek veya galeriden seç, video kaydet veya galeriden seç. Sonuçta kişi bazında baret, yelek ve emniyet kemeri durumu, bölge ihlali, düşme, iş makinesine yakınlık görünür. İsterseniz sonuçlar uyarıya dönüştürülür. |
-| **Live CCTV** | Kameraların saniyede bir yenilenen yapay zekâ işaretli görüntüsü, 2x2 grid, bölgelerin listesi (salt okunur), siren |
-| **Analytics** | Uyum endeksi, taranan kişi sayısı, ortalama müdahale süresi, KKD oranı, ihlal dağılımı, taşeron sıralaması, PDF rapor |
+| **Alerts** | Open alerts (polled every 5s), filters (Critical / PPE / Zone / Resolved), Acknowledge, False Alarm, siren/broadcast/warning actions, and in-app notification banner |
+| **Evidence** | Annotated vs. raw face-blurred evidence toggle, subcontractor, zone, tracking ID, legal citation, response actions, and incident timeline |
+| **AI Scan** | Capture or pick a photo/video for on-demand analysis. Displays per-worker hardhat, vest, and harness status, zone intrusion, fall detection, and vehicle proximity |
+| **Live CCTV** | 1 FPS AI-annotated camera feeds, 2x2 grid view, read-only zone list, and siren trigger |
+| **Analytics** | Compliance index, scanned worker count, mean response time, PPE compliance rate, violation breakdown, subcontractor ranking, and PDF report |
 
-## 4. Yapay zekâ nasıl çalışıyor
+## 4. How the AI Pipeline Works
 
-1. **YOLO11-pose** kişileri ve 17 vücut noktasını (baş, omuz, kalça, ayak bileği) bulur.
-2. **KKD kontrolü:** `weights/ppe.pt` varsa eğitilmiş KKD modeli kullanılır. Yoksa geçici bir **renk tabanlı yöntem** çalışır: baş üstünde baret renkleri, gövdede fosforlu yelek renkleri aranır.
-3. **YOLO11 (COCO)** araç ve kamyonları bulur; işçi araca çok yakınsa uyarı verir.
-4. **Kurallar:** yasak bölgeye girme (ayak noktası bölge çokgeninin içinde mi), yüksekte çalışma bölgesinde emniyet kemeri, düşme (gövde eğimi; bacaklar görünüyorsa).
-5. **Video ve kamera:** ByteTrack aynı kişiyi kareler boyunca takip eder. Bir ihlal ancak aynı kişide art arda birkaç karede görülürse uyarıya dönüşür. Aynı kişinin tekrarları tek uyarıda birleştirilir.
-6. **KVKK:** Kaydedilen ve gönderilen her görüntüde yüzler bulanıklaştırılır.
+1. **YOLO11-pose** detects workers and 17 skeletal keypoints (head, shoulders, hips, ankles).
+2. **PPE check:** Uses trained weights at `weights/ppe.pt` when present; otherwise falls back to an HSV color heuristic for hardhat and high-visibility vest regions.
+3. **YOLO11 (COCO)** detects site vehicles and trucks, raising proximity alerts when a worker enters the safety buffer.
+4. **Rule engine:** Checks polygonal danger-zone intrusion (ankle midpoint inside polygon), safety harness requirement in work-at-height zones, and fall posture (torso angle when legs are visible).
+5. **Video & stream tracking:** ByteTrack tracks worker IDs across frames. A violation triggers an incident only after persisting across consecutive frames and is deduplicated per worker/type cooldown window.
+6. **KVKK / Privacy:** All stored and transmitted evidence images automatically blur detected face regions.
 
-### Asıl KKD modelini eğitme (önemli)
-Renk tabanlı yöntem sadece başlangıç içindir. Baret takmayan ama sarı şapkalı birini baretli sanabilir; emniyet kemerini ise hiç göremez. Projenin hedefi olan %85 mAP için:
+### Training the Custom PPE Model
+To replace the heuristic fallback with a custom YOLO PPE detector targeting ≥85% mAP:
 
-1. Roboflow Universe'ten "Construction Site Safety" gibi YOLO formatında bir KKD veri seti indirin. SHWD veri seti de kullanılabilir.
-2. `training/data.yaml` içindeki yolu düzenleyin.
-3. GPU'lu bir bilgisayarda veya Google Colab'da `python training/train_ppe.py --epochs 80` komutunu çalıştırın.
-4. Oluşan `weights/ppe.pt` dosyası sunucu yeniden başlatılınca otomatik kullanılır; `/health` çıktısında `"mode": "ppe-model"` görünür.
+1. Download a YOLO-formatted PPE dataset (e.g., Construction Site Safety or SHWD).
+2. Update the dataset path in `training/data.yaml`.
+3. Run `python training/train_ppe.py --epochs 80` on a GPU machine or Colab.
+4. Place the resulting `weights/ppe.pt` file in `backend/weights/`; `/health` will report `"mode": "ppe-model"` on restart.
 
-Sınıf adları (Hardhat, NO-Hardhat, Safety Vest, harness...) otomatik eşleştirilir.
+## 5. Known Limitations & Next Steps
+- **Push notifications:** Currently polls every 5 seconds while the client is open; Firebase Cloud Messaging (FCM) is planned for background mobile notifications.
+- **Live video transport:** Uses 1 FPS annotated JPEG snapshots; WebRTC/HLS streaming can be added for low-latency continuous video.
+- **Legal citations:** Provided for guidance; the OHS specialist should verify applicability per incident.
+- **Hardware throughput:** CPU inference takes ~0.2–0.4s per frame; GPU or ONNX/TensorRT export is recommended for 4 simultaneous camera streams.
 
-## 5. Bilinen sınırlar ve sonraki adımlar
-- **Bildirimler:** Uygulama açıkken 5 saniyede bir kontrol edip bildirim bandı gösteriyor. Uygulama kapalıyken bildirim için Firebase Cloud Messaging (FCM) eklenmeli.
-- **Canlı görüntü:** Saniyede bir yenilenen işaretli kare olarak geliyor. Gerçek video akışı (WebRTC/HLS) web panelinde düşünülebilir.
-- **Mevzuat referansları:** yol gösterici niteliktedir; ilgili maddeyi İSG uzmanı teyit etmelidir.
-- **İşlem gücü:** CPU'da bir kare yaklaşık 0,2–0,4 sn sürer. GPU veya ONNX/TensorRT dönüşümüyle 4 kamera hedefine ulaşılır.
+## 6. API Summary
 
-## 6. API özeti
-
-| Yöntem | Yol | Açıklama |
+| Method | Path | Description |
 | --- | --- | --- |
-| POST | `/auth/login` | Giriş; dönen `token` diğer isteklerde `Authorization: Bearer <token>` başlığıyla gönderilir |
-| GET | `/health` | Model modu, aktif akışlar, gecikme (girişsiz) |
-| GET/POST/DELETE | `/users` | Kullanıcı yönetimi (admin) |
-| POST/DELETE | `/cameras` | Kamera ekleme/düzenleme/silme (admin) |
-| PUT | `/cameras/{id}/zones` | Bölgeleri kaydetme (admin, İSG) |
-| POST | `/cameras/{id}/reference` · GET `/cameras/{id}/frame` | Referans fotoğraf yükleme; canlı/referans kare |
-| POST/DELETE | `/subcontractors` | Taşeron yönetimi (admin, İSG) |
-| GET | `/site` | Şantiye, kameralar, bölgeler, taşeronlar |
-| GET | `/incidents?status=open&category=ppe&camera_id=CAM-01&offset=0` | Uyarı listesi (filtreli, sayfalı) |
-| GET | `/incidents/{id}` | Uyarı detayı ve zaman çizelgesi |
-| POST | `/incidents/{id}/ack` · `/false_alarm` · `/action` | Müdahale kayıtları |
-| POST | `/analyze/image` | Fotoğraf analizi (multipart: `file`, `camera_id`, `create_incidents`) |
-| POST | `/analyze/video` → GET `/jobs/{id}` | Video analizi (arka planda, ilerleme yüzdesiyle) |
-| GET | `/cameras/{id}/snapshot` | Kameranın son işaretli karesi |
-| GET | `/analytics?range=today\|week\|month` | Göstergeler |
-| GET | `/reports/summary.pdf?range=week` | PDF rapor |
+| POST | `/auth/login` · `/auth/logout` · `/auth/password` | Sign in (`Bearer <token>`), sign out, or change own password |
+| GET | `/health` | Model mode, active streams, and inference latency (public) |
+| GET/POST/PATCH/DELETE | `/users` · `/users/{id}` | User listing, creation, name/role/active-status update (`PATCH`), password reset, deletion (admin) |
+| POST/DELETE | `/cameras` · `/cameras/{id}` | Add, update, or remove cameras (admin) |
+| PUT | `/cameras/{id}/zones` | Replace polygonal danger/height zones for a camera (admin, OHS) |
+| POST / GET | `/cameras/{id}/reference` · `/cameras/{id}/frame` | Upload reference calibration image; fetch live/reference frame |
+| POST/DELETE | `/subcontractors` | Manage subcontractors and camera assignments (admin, OHS) |
+| GET | `/site` | Site metadata, cameras, zones, and subcontractors |
+| GET | `/false_alarm_reasons` | Standardized false-alarm reason codes (`wrong_detection`, `authorised_person`, `reflection_shadow`, `other`) |
+| GET | `/incidents?status=open&category=ppe&camera_id=CAM-01&offset=0` | Filtered, paginated incident list |
+| GET | `/incidents/{id}` | Incident detail and audit timeline |
+| POST | `/incidents/{id}/ack` · `/false_alarm` · `/action` | Acknowledge (`open -> acknowledged`), mark false alarm with `reason` & `note`, or log field action |
+| POST | `/analyze/image` | On-demand image analysis (multipart: `file`, `camera_id`, `create_incidents`) |
+| POST → GET | `/analyze/video` → `/jobs/{id}` | Asynchronous video analysis job with progress percentage |
+| GET | `/cameras/{id}/snapshot` | Latest AI-annotated frame for a camera |
+| GET | `/analytics?range=today\|week\|month` | Aggregated KPIs, trend series, and breakdowns |
+| GET | `/reports/summary.pdf?range=week` | Generated PDF safety summary report |

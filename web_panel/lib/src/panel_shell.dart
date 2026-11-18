@@ -1,47 +1,48 @@
 import 'dart:async';
 
+import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../models.dart';
-import '../theme.dart';
-import '../widgets.dart';
-import 'cameras_page.dart';
-import 'dashboard_page.dart';
+import 'common.dart';
 import 'incidents_page.dart';
-import 'people_pages.dart';
+import 'state.dart';
 
 class _NavItem {
-  const _NavItem(this.key, this.label, this.icon, {this.adminOnly = false});
+  const _NavItem(this.key, this.path, this.label, this.icon, {this.adminOnly = false});
   final String key;
+  final String path;
   final String label;
   final IconData icon;
   final bool adminOnly;
 }
 
 const _nav = [
-  _NavItem('dashboard', 'Dashboard', Icons.space_dashboard_outlined),
-  _NavItem('incidents', 'Incidents', Icons.notifications_none),
-  _NavItem('cameras', 'Cameras & Zones', Icons.videocam_outlined),
-  _NavItem('subcontractors', 'Subcontractors', Icons.business_outlined),
-  _NavItem('reports', 'Reports', Icons.description_outlined),
-  _NavItem('users', 'Users', Icons.manage_accounts_outlined, adminOnly: true),
+  _NavItem('dashboard', '/dashboard', 'Dashboard', Icons.space_dashboard_outlined),
+  _NavItem('incidents', '/incidents', 'Incidents', Icons.notifications_none),
+  _NavItem('cameras', '/cameras', 'Cameras & Zones', Icons.videocam_outlined),
+  _NavItem('subcontractors', '/subcontractors', 'Subcontractors', Icons.business_outlined),
+  _NavItem('reports', '/reports', 'Reports', Icons.description_outlined),
+  _NavItem('users', '/users', 'Users', Icons.manage_accounts_outlined, adminOnly: true),
 ];
 
-/// Desktop layout of the web panel: side navigation + page.
-class PanelShell extends StatefulWidget {
-  const PanelShell({super.key});
+/// Desktop layout of the web panel: side navigation + routed page content.
+class PanelShell extends ConsumerStatefulWidget {
+  const PanelShell({super.key, required this.location, required this.child});
+  final String location;
+  final Widget child;
   @override
-  State<PanelShell> createState() => _PanelShellState();
+  ConsumerState<PanelShell> createState() => _PanelShellState();
 }
 
-class _PanelShellState extends State<PanelShell> {
-  String page = 'dashboard';
+class _PanelShellState extends ConsumerState<PanelShell> {
   StreamSubscription<Incident>? _sub;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _sub ??= AppScope.read(context).newAlerts.listen(_onNewAlert);
+  void initState() {
+    super.initState();
+    _sub = ref.read(panelControllerProvider.notifier).newAlerts.listen(_onNewAlert);
   }
 
   @override
@@ -62,31 +63,59 @@ class _PanelShellState extends State<PanelShell> {
     ));
   }
 
-  Widget _page() {
-    switch (page) {
-      case 'incidents':
-        return const IncidentsPage();
-      case 'cameras':
-        return const CamerasPage();
-      case 'subcontractors':
-        return const SubcontractorsPage();
-      case 'reports':
-        return const ReportsPage();
-      case 'users':
-        return const UsersPage();
-      default:
-        return DashboardPage(
-          onOpenIncident: (i) => showIncidentDialog(context, i),
-          onGoto: (p) => setState(() => page = p),
-        );
+  String get _activeKey {
+    final loc = widget.location;
+    if (loc.startsWith('/incidents')) return 'incidents';
+    if (loc.startsWith('/cameras')) return 'cameras';
+    if (loc.startsWith('/subcontractors')) return 'subcontractors';
+    if (loc.startsWith('/reports')) return 'reports';
+    if (loc.startsWith('/users')) return 'users';
+    return 'dashboard';
+  }
+
+  Future<void> _changeOwnPassword() async {
+    final st = ref.read(panelControllerProvider);
+    final ctrl = ref.read(panelControllerProvider.notifier);
+    final pass = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: C.panel,
+        title: Text('Change password', style: sans(size: 17, weight: FontWeight.w700)),
+        content: SizedBox(
+          width: 380,
+          child: TextField(
+            controller: pass,
+            obscureText: true,
+            decoration: fieldDecoration('New password (min 6)', icon: Icons.lock_outline),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Update', style: sans(size: 14, color: C.orange, weight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    final newPass = pass.text;
+    if (ok != true) return;
+    try {
+      await st.api.changeOwnPassword(newPass);
+      if (mounted) toast(context, 'Password changed. Please sign in again.');
+      await ctrl.logout();
+    } catch (e) {
+      if (mounted) toast(context, e.toString(), error: true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final st = AppScope.of(context);
+    final st = ref.watch(panelControllerProvider);
+    final ctrl = ref.read(panelControllerProvider.notifier);
     final items = _nav.where((n) => !n.adminOnly || (st.user?.isAdmin ?? false)).toList();
-    if (!items.any((n) => n.key == page)) page = 'dashboard';
+    final activeKey = _activeKey;
     final h = st.health;
     return Scaffold(
       body: LayoutBuilder(builder: (context, c) {
@@ -118,11 +147,11 @@ class _PanelShellState extends State<PanelShell> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                   child: Material(
-                    color: page == n.key ? alpha(C.orange, 0.15) : Colors.transparent,
+                    color: activeKey == n.key ? alpha(C.orange, 0.15) : Colors.transparent,
                     borderRadius: BorderRadius.circular(10),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(10),
-                      onTap: () => setState(() => page = n.key),
+                      onTap: () => context.go(n.path),
                       child: Tooltip(
                         message: extended ? '' : n.label,
                         child: Container(
@@ -132,9 +161,9 @@ class _PanelShellState extends State<PanelShell> {
                               mainAxisAlignment: extended ? MainAxisAlignment.start : MainAxisAlignment.center,
                               children: [
                                 Stack(clipBehavior: Clip.none, children: [
-                                  Icon(n.icon, color: page == n.key ? C.orange : C.muted, size: 21),
+                                  Icon(n.icon, color: activeKey == n.key ? C.orange : C.muted, size: 21),
                                   if (n.key == 'incidents' && st.openIncidents.isNotEmpty)
-                                    Positioned(right: -6, top: -5, child: Dot(color: C.red, size: 9)),
+                                    const Positioned(right: -6, top: -5, child: Dot(color: C.red, size: 9)),
                                 ]),
                                 if (extended) ...[
                                   const SizedBox(width: 12),
@@ -143,7 +172,7 @@ class _PanelShellState extends State<PanelShell> {
                                         style: sans(
                                             size: 13.5,
                                             weight: FontWeight.w600,
-                                            color: page == n.key ? C.orange : C.text)),
+                                            color: activeKey == n.key ? C.orange : C.text)),
                                   ),
                                   if (n.key == 'incidents' && st.openIncidents.isNotEmpty)
                                     Pill('${st.openIncidents.length}', color: C.red, small: true),
@@ -172,16 +201,26 @@ class _PanelShellState extends State<PanelShell> {
                 padding: const EdgeInsets.all(10),
                 child: Row(mainAxisAlignment: extended ? MainAxisAlignment.start : MainAxisAlignment.center, children: [
                   if (extended) ...[
-                    const CircleAvatar(radius: 16, backgroundColor: C.panel2, child: Icon(Icons.person, size: 18, color: C.muted)),
+                    const CircleAvatar(
+                        radius: 16, backgroundColor: C.panel2, child: Icon(Icons.person, size: 18, color: C.muted)),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(st.user?.name ?? '', style: sans(size: 13, weight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                        Text(st.user?.name ?? '',
+                            style: sans(size: 13, weight: FontWeight.w600), overflow: TextOverflow.ellipsis),
                         Text(st.user?.roleLabel ?? '', style: mono(size: 10, color: C.muted)),
                       ]),
                     ),
+                    IconButton(
+                      tooltip: 'Change password',
+                      icon: const Icon(Icons.key_outlined, color: C.muted, size: 18),
+                      onPressed: _changeOwnPassword,
+                    ),
                   ],
-                  IconButton(tooltip: 'Sign out', icon: const Icon(Icons.logout, color: C.pink, size: 20), onPressed: st.logout),
+                  IconButton(
+                      tooltip: 'Sign out',
+                      icon: const Icon(Icons.logout, color: C.pink, size: 20),
+                      onPressed: ctrl.logout),
                 ]),
               ),
             ]),
@@ -196,7 +235,7 @@ class _PanelShellState extends State<PanelShell> {
                   child: Text('Connection to the server lost · showing the last synced data, retrying every 5 s',
                       style: sans(size: 12.5, color: C.yellow)),
                 ),
-              Expanded(child: KeyedSubtree(key: ValueKey(page), child: _page())),
+              Expanded(child: widget.child),
             ]),
           ),
         ]);

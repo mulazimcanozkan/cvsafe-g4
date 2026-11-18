@@ -46,6 +46,8 @@ class Incident {
   final String? imageUrl;
   final String? rawUrl;
   final String? mode;
+  /// Reason code when [status] is `false_alarm` (see [FalseAlarmReason]).
+  final String? falseAlarmReason;
   List<TimelineEvent> timeline;
 
   Incident({
@@ -70,11 +72,16 @@ class Incident {
     this.imageUrl,
     this.rawUrl,
     this.mode,
+    this.falseAlarmReason,
     required this.timeline,
   });
 
   bool get isOpen => status == 'open';
   bool get isCritical => severity == 'critical';
+
+  /// Allowed status changes (BR-02): open -> acknowledged, open/acknowledged -> false_alarm.
+  bool get canAcknowledge => status == 'open';
+  bool get canMarkFalseAlarm => status == 'open' || status == 'acknowledged';
 
   String get categoryLabel {
     if (types.contains('fall')) return 'FALL HAZARD';
@@ -108,6 +115,7 @@ class Incident {
       imageUrl: j['image_url'] as String?,
       rawUrl: j['raw_url'] as String?,
       mode: meta['mode'] as String?,
+      falseAlarmReason: j['false_alarm_reason'] as String?,
       timeline: ((j['timeline'] as List?) ?? const [])
           .map((e) => TimelineEvent.fromJson((e as Map).cast<String, dynamic>()))
           .toList(),
@@ -130,6 +138,19 @@ class Zone {
             .toList(),
       );
   Map<String, dynamic> toJson() => {'id': id.isEmpty ? null : id, 'name': name, 'type': type, 'polygon': polygon};
+
+  /// Deep copy (the polygon points are copied too), optionally with new values.
+  Zone copyWith({String? name, String? type, List<List<double>>? polygon}) =>
+      Zone(id, name ?? this.name, type ?? this.type, [for (final p in polygon ?? this.polygon) [...p]]);
+}
+
+/// A selectable reason for marking an alert as a false alarm (FR-13), from `GET /false_alarm_reasons`.
+class FalseAlarmReason {
+  final String code;
+  final String label;
+  const FalseAlarmReason(this.code, this.label);
+  factory FalseAlarmReason.fromJson(Map<String, dynamic> j) =>
+      FalseAlarmReason(j['code'] as String? ?? '', j['label'] as String? ?? '');
 }
 
 class Camera {
@@ -189,10 +210,20 @@ class UserInfo {
   final String username;
   final String name;
   final String role; // admin | ohs | field
-  UserInfo(this.id, this.username, this.name, this.role);
+  final bool isActive; // false = deactivated, cannot sign in
+  final double? lastLoginAt;
+  UserInfo(this.id, this.username, this.name, this.role, {this.isActive = true, this.lastLoginAt});
   factory UserInfo.fromJson(Map<String, dynamic> j) => UserInfo(
-      _i(j['id']), j['username'] as String? ?? '', j['name'] as String? ?? '', j['role'] as String? ?? 'field');
-  Map<String, dynamic> toJson() => {'id': id, 'username': username, 'name': name, 'role': role};
+      _i(j['id']), j['username'] as String? ?? '', j['name'] as String? ?? '', j['role'] as String? ?? 'field',
+      isActive: j['is_active'] as bool? ?? true, lastLoginAt: _dn(j['last_login_at']));
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'username': username,
+        'name': name,
+        'role': role,
+        'is_active': isActive,
+        'last_login_at': lastLoginAt,
+      };
   bool get isAdmin => role == 'admin';
   bool get canManage => role == 'admin' || role == 'ohs';
   String get roleLabel => const {'admin': 'Administrator', 'ohs': 'OHS Specialist', 'field': 'Site Manager'}[role] ?? role;

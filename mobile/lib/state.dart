@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'api.dart';
 import 'demo.dart';
-import 'models.dart';
 
 /// App-wide state: server connection, incidents (polled), site and analytics.
 class AppState extends ChangeNotifier {

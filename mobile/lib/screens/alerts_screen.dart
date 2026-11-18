@@ -1,7 +1,6 @@
+import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 
-import '../models.dart';
-import '../theme.dart';
 import '../widgets.dart';
 
 /// Live alert feed for the field manager: acknowledge, act or mark false alarm.

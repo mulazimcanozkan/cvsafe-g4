@@ -17,13 +17,15 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from . import analytics as analytics_mod
-from .auth import ROLES, Auth
+from .auth import ROLES, AccountDisabled, Auth
 from .report import build_pdf
+from .rules import FALSE_ALARM_REASONS
 from .service import SafetyService
+from .store import InvalidTransition
 
 BASE = Path(__file__).resolve().parent.parent
 CONFIG = Path(os.environ.get("CVSAFE_CONFIG", BASE / "config.yaml"))
@@ -113,7 +115,20 @@ class PasswordBody(BaseModel):
     password: str
 
 
+class UserUpdateBody(BaseModel):
+    """Partial update of a user; omitted fields stay unchanged."""
+    model_config = ConfigDict(extra="forbid")
+    name: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+
+
 class Note(BaseModel):
+    note: str | None = None
+
+
+class FalseAlarmBody(BaseModel):
+    reason: str | None = Field(None, description="Code from GET /false_alarm_reasons; defaults to 'other'")
     note: str | None = None
 
 
@@ -171,7 +186,10 @@ def _camera_or_404(cam_id: str):
 
 @app.post("/auth/login")
 def login(body: LoginBody):
-    res = auth.login(body.username, body.password)
+    try:
+        res = auth.login(body.username, body.password)
+    except AccountDisabled:
+        raise HTTPException(403, "This account is deactivated. Contact your administrator.")
     if not res:
         raise HTTPException(401, "Wrong username or password")
     return res
@@ -217,10 +235,29 @@ def delete_user(uid: int, user=ADMIN):
         raise HTTPException(404, "User not found")
     if target["id"] == user["id"]:
         raise HTTPException(400, "You cannot delete yourself")
-    if target["role"] == "admin" and auth.count_admins() <= 1:
+    if target["role"] == "admin" and target["is_active"] and auth.count_admins() <= 1:
         raise HTTPException(400, "At least one admin must remain")
     auth.delete_user(uid)
     return {"ok": True}
+
+
+@app.patch("/users/{uid}")
+def update_user(uid: int, body: UserUpdateBody, user=ADMIN):
+    """Edit name / role, or deactivate / reactivate an account (FR-21, BR-11)."""
+    target = auth.get_user(uid)
+    if not target:
+        raise HTTPException(404, "User not found")
+    demote = body.role is not None and body.role != "admin"
+    deactivate = body.is_active is False
+    if target["id"] == user["id"] and (demote or deactivate):
+        raise HTTPException(400, "You cannot demote or deactivate yourself")
+    if (target["role"] == "admin" and target["is_active"] and (demote or deactivate)
+            and auth.count_admins() <= 1):
+        raise HTTPException(400, "At least one active admin must remain")
+    try:
+        return auth.update_user(uid, name=body.name, role=body.role, is_active=body.is_active)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.post("/users/{uid}/password")
@@ -386,18 +423,35 @@ def incident(iid: int, user=ANY):
     return _incident_or_404(iid)
 
 
+@app.get("/false_alarm_reasons")
+def false_alarm_reasons(user=ANY):
+    """Reason codes for marking an alert as a false alarm (FR-13)."""
+    return [{"code": code, "label": label} for code, label in FALSE_ALARM_REASONS.items()]
+
+
 @app.post("/incidents/{iid}/ack")
 def acknowledge(iid: int, body: Note | None = None, user=ANY):
     _incident_or_404(iid)
-    svc.store.set_status(iid, "acknowledged", body.note if body else None, actor=user["name"])
+    _set_status(iid, "acknowledged", note=body.note if body else None, actor=user["name"])
     return svc.store.get_incident(iid)
 
 
 @app.post("/incidents/{iid}/false_alarm")
-def false_alarm(iid: int, body: Note | None = None, user=ANY):
+def false_alarm(iid: int, body: FalseAlarmBody | None = None, user=ANY):
     _incident_or_404(iid)
-    svc.store.set_status(iid, "false_alarm", body.note if body else None, actor=user["name"])
+    _set_status(iid, "false_alarm", note=body.note if body else None, actor=user["name"],
+                reason=body.reason if body else None)
     return svc.store.get_incident(iid)
+
+
+def _set_status(iid: int, status: str, **kwargs):
+    """Maps store errors to HTTP: 409 for a forbidden status change (BR-02), 400 for bad input."""
+    try:
+        svc.store.set_status(iid, status, **kwargs)
+    except InvalidTransition as e:
+        raise HTTPException(409, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.post("/incidents/{iid}/action")
@@ -463,3 +517,9 @@ def report(range: str = Query("today", pattern="^(today|week|month)$"), user=ANY
     pdf = build_pdf(stats, incs, svc.cfg, str(svc.media))
     return Response(pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="cvsafe_{range}.pdf"'})
+
+
+WEB_BUILD = BASE.parent / "web_panel" / "build" / "web"
+if WEB_BUILD.is_dir():
+    app.mount("/", StaticFiles(directory=str(WEB_BUILD), html=True), name="web_panel")
+

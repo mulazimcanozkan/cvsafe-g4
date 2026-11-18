@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Colours taken from the CVSAFE mobile mock-ups.
+/// Colours taken from the CVSAFE mobile mock-ups (shared by the web panel).
 class C {
   static const bg = Color(0xFF0D1626);
   static const panel = Color(0xFF15213A);
@@ -22,18 +22,27 @@ class C {
 
 Color alpha(Color c, double opacity) => c.withAlpha((opacity * 255).round().clamp(0, 255));
 
+/// Set to true in widget tests: Google Fonts are fetched over the network at runtime,
+/// which is not available under `flutter test`. The platform default font is used instead.
+bool debugDisableGoogleFonts = false;
+
 TextStyle mono({double size = 13, Color color = C.text, FontWeight weight = FontWeight.w500, double? spacing}) =>
-    GoogleFonts.jetBrainsMono(fontSize: size, color: color, fontWeight: weight, letterSpacing: spacing);
+    debugDisableGoogleFonts
+        ? TextStyle(fontSize: size, color: color, fontWeight: weight, letterSpacing: spacing, fontFamily: 'monospace')
+        : GoogleFonts.jetBrainsMono(fontSize: size, color: color, fontWeight: weight, letterSpacing: spacing);
 
 TextStyle sans({double size = 14, Color color = C.text, FontWeight weight = FontWeight.w400, double? height}) =>
-    GoogleFonts.inter(fontSize: size, color: color, fontWeight: weight, height: height);
+    debugDisableGoogleFonts
+        ? TextStyle(fontSize: size, color: color, fontWeight: weight, height: height)
+        : GoogleFonts.inter(fontSize: size, color: color, fontWeight: weight, height: height);
 
 ThemeData buildTheme() {
   final base = ThemeData.dark(useMaterial3: true);
   return base.copyWith(
     scaffoldBackgroundColor: C.bg,
     colorScheme: base.colorScheme.copyWith(primary: C.orange, secondary: C.green, surface: C.panel, error: C.red),
-    textTheme: GoogleFonts.interTextTheme(base.textTheme).apply(bodyColor: C.text, displayColor: C.text),
+    textTheme: (debugDisableGoogleFonts ? base.textTheme : GoogleFonts.interTextTheme(base.textTheme))
+        .apply(bodyColor: C.text, displayColor: C.text),
     snackBarTheme: const SnackBarThemeData(backgroundColor: C.panel2, behavior: SnackBarBehavior.floating),
     progressIndicatorTheme: const ProgressIndicatorThemeData(color: C.orange),
   );

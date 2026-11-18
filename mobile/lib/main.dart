@@ -1,17 +1,16 @@
 import 'dart:async';
 
+import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'login_screen.dart';
-import 'models.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/evidence_screen.dart';
 import 'screens/live_screen.dart';
 import 'screens/scan_screen.dart';
 import 'state.dart';
-import 'theme.dart';
 import 'widgets.dart';
 
 void main() {

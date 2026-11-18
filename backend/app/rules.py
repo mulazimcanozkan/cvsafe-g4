@@ -45,6 +45,23 @@ VIOLATIONS = {
 
 SEVERITY_RANK = {"critical": 3, "high": 2, "moderate": 1, "low": 0}
 
+# Reasons selectable when an alert is marked as a false alarm (FR-13, NFR-04).
+# Mirrors the `false_alarm_reasons` lookup table of the database design.
+FALSE_ALARM_REASONS = {
+    "wrong_detection": "Wrong detection",
+    "authorised_person": "Authorised person in the zone",
+    "reflection_shadow": "Reflection or shadow",
+    "other": "Other",
+}
+DEFAULT_FALSE_ALARM_REASON = "other"
+
+# Allowed incident status changes (BR-02): there is no way back to "open".
+STATUS_TRANSITIONS = {
+    "open": {"acknowledged", "false_alarm"},
+    "acknowledged": {"false_alarm"},
+    "false_alarm": set(),
+}
+
 
 def incident_title(types):
     """Combine several violation types of one person into one headline."""

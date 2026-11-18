@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../models.dart';
-import '../theme.dart';
 import '../widgets.dart';
 
 /// AI Scan: analyse a photo or video taken in the field with the same models
@@ -181,7 +180,7 @@ class _ScanScreenState extends State<ScanScreen> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: createAlerts,
-            activeColor: C.orange,
+            activeThumbColor: C.orange,
             onChanged: busy ? null : (v) => setState(() => createAlerts = v),
             title: Text('Create alerts for violations', style: sans(size: 13.5)),
             subtitle: Text('Off = analyse only, nothing is logged', style: sans(size: 11.5, color: C.muted)),

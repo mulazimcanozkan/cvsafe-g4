@@ -1,21 +1,21 @@
 import 'dart:async';
 
+import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../models.dart';
-import '../theme.dart';
-import '../widgets.dart';
 import 'common.dart';
-import 'zone_editor.dart';
+import 'state.dart';
 
 /// Camera list with live / reference frames; add, edit, delete and open the zone editor.
-class CamerasPage extends StatefulWidget {
+class CamerasPage extends ConsumerStatefulWidget {
   const CamerasPage({super.key});
   @override
-  State<CamerasPage> createState() => _CamerasPageState();
+  ConsumerState<CamerasPage> createState() => _CamerasPageState();
 }
 
-class _CamerasPageState extends State<CamerasPage> {
+class _CamerasPageState extends ConsumerState<CamerasPage> {
   Timer? _tick;
   int _bust = 0;
 
@@ -23,9 +23,11 @@ class _CamerasPageState extends State<CamerasPage> {
   void initState() {
     super.initState();
     // refresh thumbnails every 3 s (live cameras show the latest annotated frame)
-    _tick = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) setState(() => _bust++);
-    });
+    if (ref.read(pollEnabledProvider)) {
+      _tick = Timer.periodic(const Duration(seconds: 3), (_) {
+        if (mounted) setState(() => _bust++);
+      });
+    }
   }
 
   @override
@@ -35,7 +37,8 @@ class _CamerasPageState extends State<CamerasPage> {
   }
 
   Future<void> _edit({Camera? cam}) async {
-    final st = AppScope.read(context);
+    final st = ref.read(panelControllerProvider);
+    final ctrl = ref.read(panelControllerProvider.notifier);
     final subs = st.site?.subcontractors ?? const <Subcontractor>[];
     final id = TextEditingController(text: cam?.id ?? '');
     final name = TextEditingController(text: cam?.name ?? '');
@@ -58,7 +61,9 @@ class _CamerasPageState extends State<CamerasPage> {
                 decoration: fieldDecoration('Camera ID', hint: 'CAM-05', icon: Icons.tag),
               ),
               const SizedBox(height: 10),
-              TextField(controller: name, decoration: fieldDecoration('Name / location', hint: 'North gate', icon: Icons.place_outlined)),
+              TextField(
+                  controller: name,
+                  decoration: fieldDecoration('Name / location', hint: 'North gate', icon: Icons.place_outlined)),
               const SizedBox(height: 10),
               TextField(
                 controller: source,
@@ -76,14 +81,16 @@ class _CamerasPageState extends State<CamerasPage> {
                     dropdownColor: C.panel2,
                     items: [
                       DropdownMenuItem<String?>(value: null, child: Text('None', style: sans(size: 13.5))),
-                      for (final s in subs) DropdownMenuItem<String?>(value: s.id, child: Text(s.name, style: sans(size: 13.5))),
+                      for (final s in subs)
+                        DropdownMenuItem<String?>(value: s.id, child: Text(s.name, style: sans(size: 13.5))),
                     ],
                     onChanged: (v) => setD(() => sub = v),
                   ),
                 ),
               ),
               const SizedBox(height: 8),
-              Text('Leave the source empty if there is no stream yet: photos and videos can still be assigned to this camera.',
+              Text(
+                  'Leave the source empty if there is no stream yet: photos and videos can still be assigned to this camera.',
                   style: sans(size: 11.5, color: C.muted)),
               if (error != null) ...[
                 const SizedBox(height: 10),
@@ -103,8 +110,11 @@ class _CamerasPageState extends State<CamerasPage> {
                       });
                       try {
                         await st.api.saveCamera(
-                            id: id.text.trim(), name: name.text.trim(), source: source.text.trim(), subcontractor: sub);
-                        await st.reloadSite();
+                            id: id.text.trim(),
+                            name: name.text.trim(),
+                            source: source.text.trim(),
+                            subcontractor: sub);
+                        await ctrl.reloadSite();
                         if (ctx.mounted) Navigator.pop(ctx);
                       } catch (e) {
                         setD(() {
@@ -122,26 +132,27 @@ class _CamerasPageState extends State<CamerasPage> {
   }
 
   Future<void> _delete(Camera cam) async {
-    final st = AppScope.read(context);
+    final st = ref.read(panelControllerProvider);
+    final ctrl = ref.read(panelControllerProvider.notifier);
     if (!await confirmDialog(context, 'Delete ${cam.id}?',
         'The camera and its zones are removed. Past incidents stay in the log.')) {
       return;
     }
     try {
       await st.api.deleteCamera(cam.id);
-      await st.reloadSite();
+      await ctrl.reloadSite();
     } catch (e) {
       if (mounted) toast(context, e.toString(), error: true);
     }
   }
 
   void _zones(Camera cam) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ZoneEditorPage(camera: cam)));
+    context.go('/cameras/${Uri.encodeComponent(cam.id)}/zones');
   }
 
   @override
   Widget build(BuildContext context) {
-    final st = AppScope.of(context);
+    final st = ref.watch(panelControllerProvider);
     final isAdmin = st.user?.isAdmin ?? false;
     final cams = st.site?.cameras ?? const <Camera>[];
     return PanelPage(
@@ -166,8 +177,12 @@ class _CamerasPageState extends State<CamerasPage> {
                     Positioned(
                       right: 8,
                       top: 8,
-                      child: Pill(c.live ? 'LIVE · ${c.fps.toStringAsFixed(1)} FPS' : (c.hasReference ? 'REFERENCE PHOTO' : 'OFFLINE'),
-                          color: c.live ? C.green : C.muted, small: true),
+                      child: Pill(
+                          c.live
+                              ? 'LIVE · ${c.fps.toStringAsFixed(1)} FPS'
+                              : (c.hasReference ? 'REFERENCE PHOTO' : 'OFFLINE'),
+                          color: c.live ? C.green : C.muted,
+                          small: true),
                     ),
                   ]),
                   const SizedBox(height: 10),
@@ -187,7 +202,9 @@ class _CamerasPageState extends State<CamerasPage> {
                       const SizedBox(width: 6),
                       IconButton(tooltip: 'Edit', icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(cam: c)),
                       IconButton(
-                          tooltip: 'Delete', icon: const Icon(Icons.delete_outline, color: C.pink), onPressed: () => _delete(c)),
+                          tooltip: 'Delete',
+                          icon: const Icon(Icons.delete_outline, color: C.pink),
+                          onPressed: () => _delete(c)),
                     ],
                   ]),
                 ]),

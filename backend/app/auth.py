@@ -32,6 +32,18 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 """
 
+# Columns added after the first prototype release (soft delete and last sign-in for the web panel).
+MIGRATIONS = {
+    "users": {
+        "is_active": "INTEGER NOT NULL DEFAULT 1",  # 0 = deactivated, cannot sign in (FR-21)
+        "last_login_at": "REAL",
+    },
+}
+
+
+class AccountDisabled(Exception):
+    """Raised on sign-in with the correct password for a deactivated account."""
+
 
 def hash_password(pw: str) -> str:
     salt = secrets.token_hex(16)
@@ -49,15 +61,22 @@ def check_password(pw: str, stored: str) -> bool:
 
 
 def _public(row):
-    return None if row is None else {"id": row["id"], "username": row["username"], "name": row["name"],
-                                     "role": row["role"]}
+    if row is None:
+        return None
+    keys = row.keys()
+    return {"id": row["id"], "username": row["username"], "name": row["name"], "role": row["role"],
+            "is_active": bool(row["is_active"]) if "is_active" in keys else True,
+            "last_login_at": row["last_login_at"] if "last_login_at" in keys else None}
 
 
 class Auth:
     def __init__(self, store):
+        from .store import ensure_columns
+
         self.store = store
         with store.lock:
             store.db.executescript(SCHEMA)
+            ensure_columns(store.db, MIGRATIONS)
             store.db.commit()
 
     def ensure_default_admin(self, password: str):
@@ -107,8 +126,37 @@ class Auth:
             return cur.rowcount > 0
 
     def count_admins(self):
+        """Number of active administrators (BR-11: at least one must remain)."""
         with self.store.lock:
-            return self.store.db.execute("SELECT COUNT(*) FROM users WHERE role='admin'").fetchone()[0]
+            return self.store.db.execute(
+                "SELECT COUNT(*) FROM users WHERE role='admin' AND is_active=1").fetchone()[0]
+
+    def update_user(self, uid, *, name=None, role=None, is_active=None):
+        """Change display name, role and/or active flag. Deactivation revokes all sessions.
+
+        Business rules that need the acting user (BR-11, no self-lockout) are checked by the API.
+        """
+        sets, args = [], []
+        if name is not None:
+            if not name.strip():
+                raise ValueError("Name cannot be empty")
+            sets.append("name=?")
+            args.append(name.strip())
+        if role is not None:
+            if role not in ROLES:
+                raise ValueError("Unknown role")
+            sets.append("role=?")
+            args.append(role)
+        if is_active is not None:
+            sets.append("is_active=?")
+            args.append(1 if is_active else 0)
+        with self.store.lock:
+            if sets:
+                self.store.db.execute(f"UPDATE users SET {', '.join(sets)} WHERE id=?", (*args, uid))
+            if is_active is False:
+                self.store.db.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+            self.store.db.commit()
+            return self.get_user(uid, locked=True)
 
     def set_password(self, uid, password):
         if len(password) < 6:
@@ -119,25 +167,32 @@ class Auth:
             self.store.db.commit()
 
     def login(self, username, password):
+        """Returns {token, user} or None for wrong credentials; raises AccountDisabled if deactivated."""
         with self.store.lock:
             row = self.store.db.execute("SELECT * FROM users WHERE username=?",
                                         (username.strip().lower(),)).fetchone()
         if row is None or not check_password(password, row["pw_hash"]):
             return None
+        if not row["is_active"]:
+            raise AccountDisabled()
         token = secrets.token_urlsafe(32)
+        now = time.time()
         with self.store.lock:
-            self.store.db.execute("DELETE FROM sessions WHERE expires<?", (time.time(),))
+            self.store.db.execute("DELETE FROM sessions WHERE expires<?", (now,))
             self.store.db.execute("INSERT INTO sessions (token, user_id, expires) VALUES (?,?,?)",
-                                  (token, row["id"], time.time() + SESSION_DAYS * 86400))
+                                  (token, row["id"], now + SESSION_DAYS * 86400))
+            self.store.db.execute("UPDATE users SET last_login_at=? WHERE id=?", (now, row["id"]))
             self.store.db.commit()
-        return {"token": token, "user": _public(row)}
+            user = self.get_user(row["id"], locked=True)
+        return {"token": token, "user": user}
 
     def user_for_token(self, token):
         if not token:
             return None
         with self.store.lock:
             row = self.store.db.execute(
-                "SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?",
+                "SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id "
+                "WHERE s.token=? AND s.expires>? AND u.is_active=1",
                 (token, time.time())).fetchone()
         return _public(row)
 

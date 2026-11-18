@@ -1,7 +1,6 @@
+import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 
-import 'api.dart';
-import 'theme.dart';
 import 'widgets.dart';
 
 /// Shared login screen for the mobile app and the web panel.
