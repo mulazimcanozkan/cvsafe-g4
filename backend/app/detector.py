@@ -26,6 +26,14 @@ SKELETON = [(5, 6), (5, 7), (7, 9), (6, 8), (8, 10), (5, 11), (6, 12), (11, 12),
 KP_CONF = 0.35
 VEHICLE_COCO = {2: "car", 5: "bus", 7: "truck"}
 MIN_PERSON_PX = 60  # people smaller than this are counted but PPE is not judged
+# Every PPE item the system knows. A trained model may cover only some of them.
+PPE_ITEMS = ("hardhat", "vest", "harness", "gloves", "goggles", "boots", "mask")
+# Small items (often hidden or too small at CCTV distance): a missing box is not evidence,
+# only an explicit "NO-..." detection counts as a violation.
+SMALL_ITEMS = ("gloves", "goggles", "boots", "mask")
+# Hard hat and vest are always required. The small items become violations only when the site
+# lists them in config.yaml -> detection.required_ppe (e.g. [gloves, boots]); otherwise they are
+# reported per worker for information.
 
 GREEN, RED, ORANGE, YELLOW, WHITE = (94, 197, 34), (68, 68, 239), (22, 115, 249), (8, 179, 234), (240, 240, 240)
 
@@ -99,6 +107,14 @@ class Detector:
         self.ppe = YOLO(str(ppe)) if ppe.is_file() else None
         self.mode = "ppe-model" if self.ppe else "baseline"
         self.ppe_classes = self._map_ppe_classes() if self.ppe else {}
+        # True when the PPE model was trained with harness examples. Config "harness_trained"
+        # decides; if it is not set, model v2 (which also knows gloves/goggles/boots) counts as
+        # trained and model v1 (harness class without examples) does not.
+        known = {v[0] for v in self.ppe_classes.values()}
+        flag = cfg.get("harness_trained")
+        self.harness_trained = "harness" in known and (
+            bool(flag) if flag is not None else bool(known & set(SMALL_ITEMS)))
+        self.required = {i for i in cfg.get("required_ppe", []) if i in SMALL_ITEMS}
         self.last_latency_ms = 0.0
 
     # ------------------------------------------------------------------ models
@@ -116,9 +132,17 @@ class Detector:
                 mapping[cid] = ("hardhat", not neg)
             elif "vest" in n:
                 mapping[cid] = ("vest", not neg)
-            elif "harness" in n:
+            elif "harness" in n or "belt" in n:
                 mapping[cid] = ("harness", not neg)
-            elif n in ("machinery", "vehicle", "excavator", "truck", "crane"):
+            elif "glove" in n or "hand-protection" in n:
+                mapping[cid] = ("gloves", not neg)
+            elif "goggle" in n or "eye-protection" in n or "safety-glass" in n:
+                mapping[cid] = ("goggles", not neg)
+            elif "boot" in n or "foot-protection" in n or "safety-shoe" in n:
+                mapping[cid] = ("boots", not neg)
+            elif "mask" in n or "respiratory" in n:
+                mapping[cid] = ("mask", not neg)
+            elif n in ("machinery", "vehicle", "excavator", "truck", "crane", "loader", "bulldozer"):
                 mapping[cid] = ("vehicle", True)
         return mapping
 
@@ -129,6 +153,9 @@ class Detector:
         persons = self._detect_persons(img, track_model)
         vehicles = self._detect_vehicles(img)
         ppe_boxes = self._detect_ppe(img)
+        # a trained PPE model may also detect construction machinery (excavator, loader...)
+        vehicles += [{"label": "machinery", "box": d["box"], "conf": d["conf"]}
+                     for d in ppe_boxes if d["item"] == "vehicle"]
         for p in persons:
             self._judge_ppe(img, p, ppe_boxes)
         self._apply_rules(persons, vehicles, zones or [], w, h)
@@ -219,34 +246,44 @@ class Detector:
     # ------------------------------------------------------------------ PPE
     def _judge_ppe(self, img, p: Person, ppe_boxes):
         if p.height < MIN_PERSON_PX:
-            p.ppe = {k: {"state": None, "conf": 0.0} for k in ("hardhat", "vest", "harness")}
+            p.ppe = {k: {"state": None, "conf": 0.0} for k in self.items()}
             return
         if self.ppe is not None:
             p.ppe = self._ppe_from_model(p, ppe_boxes)
         else:
             p.ppe = self._ppe_from_colour(img, p)
 
+    def items(self):
+        """PPE items reported for each person: the classic three plus what the model knows."""
+        known = {v[0] for v in self.ppe_classes.values()}
+        return [i for i in PPE_ITEMS if i in ("hardhat", "vest", "harness") or i in known]
+
     def _ppe_from_model(self, p: Person, ppe_boxes):
         hx1, hy1, hx2, hy2, _ = self.head_box(p)
+        face = (hx1, hy1, hx2, hy2)
         hy1 -= (hy2 - hy1) * 0.6  # helmets sit above the head keypoints
         x1, y1, x2, y2 = p.box
+        bh = y2 - y1
+        regions = {
+            "hardhat": (hx1, hy1, hx2, hy2),
+            "goggles": face,
+            "boots": (x1, y1 + bh * 0.6, x2, y2 + bh * 0.1),
+        }
         result = {}
-        for item in ("hardhat", "vest", "harness"):
+        for item in self.items():
+            rx1, ry1, rx2, ry2 = regions.get(item, (x1, y1, x2, y2))
             best = None
             for d in ppe_boxes:
                 if d["item"] != item:
                     continue
                 cx, cy = (d["box"][0] + d["box"][2]) / 2, (d["box"][1] + d["box"][3]) / 2
-                if item == "hardhat":
-                    inside = hx1 <= cx <= hx2 and hy1 <= cy <= hy2
-                else:
-                    inside = x1 <= cx <= x2 and y1 <= cy <= y2
-                if inside and (best is None or d["conf"] > best["conf"]):
+                if rx1 <= cx <= rx2 and ry1 <= cy <= ry2 and (best is None or d["conf"] > best["conf"]):
                     best = d
             if best is not None:
                 result[item] = {"state": best["positive"], "conf": round(best["conf"], 3)}
-            elif item == "harness" and not any(v[0] == "harness" for v in self.ppe_classes.values()):
-                result[item] = {"state": None, "conf": 0.0}  # model cannot see harnesses
+            elif item in SMALL_ITEMS or (item == "harness" and not self.harness_trained):
+                # Not seeing a small item (or a harness the model was never taught) is not evidence.
+                result[item] = {"state": None, "conf": 0.0}
             else:
                 result[item] = {"state": False, "conf": 0.5}
         return result
@@ -327,14 +364,27 @@ class Detector:
                 v.append("no_hardhat")
             if p.ppe.get("vest", {}).get("state") is False:
                 v.append("no_vest")
+            for item in SMALL_ITEMS:
+                st = p.ppe.get(item)
+                if st is None:
+                    continue
+                st["required"] = item in self.required
+                if st.get("state") is False and st["required"]:
+                    v.append(f"no_{item}")
             fx, fy = self.foot_point(p)
+            at_height = False
             for z, pts in polys:
                 if cv2.pointPolygonTest(pts, (float(fx), float(fy)), False) >= 0:
                     p.zones.append(z["name"])
                     if z.get("type") == "restricted":
                         v.append("zone_breach")
-                    elif z.get("type") == "height" and p.ppe.get("harness", {}).get("state") is False:
-                        v.append("no_harness_at_height")
+                    elif z.get("type") == "height":
+                        at_height = True
+                        if p.ppe.get("harness", {}).get("state") is False:
+                            v.append("no_harness_at_height")
+            # A harness is only required inside "height" zones; elsewhere a missing one is information.
+            if "harness" in p.ppe:
+                p.ppe["harness"]["required"] = at_height
             if self._is_fallen(p):
                 v.append("fall")
             for veh in vehicles:
@@ -422,12 +472,16 @@ class Detector:
                     if pa and pb:
                         cv2.line(out, tuple(map(int, pa)), tuple(map(int, pb)), ORANGE, th, cv2.LINE_AA)
             lines = [f"[W-{p.label_id}] " + ("VIOLATION" if p.violations else "PASS")]
-            for item, name in (("hardhat", "HARD HAT"), ("vest", "HI-VIS VEST"), ("harness", "HARNESS")):
+            for item, name in (("hardhat", "HARD HAT"), ("vest", "HI-VIS VEST"), ("harness", "HARNESS"),
+                               ("gloves", "GLOVES"), ("goggles", "GOGGLES"), ("boots", "SAFETY BOOTS"),
+                               ("mask", "MASK")):
                 st = p.ppe.get(item, {})
                 if st.get("state") is True:
                     lines.append(f"+ {name} {st['conf']:.0%}")
                 elif st.get("state") is False:
-                    lines.append(f"x NO {name} {st['conf']:.0%}")
+                    # optional items (not required on this site) are shown as information, not in red
+                    mark = "-" if st.get("required") is False else "x"
+                    lines.append(f"{mark} NO {name} {st['conf']:.0%}")
             if "zone_breach" in p.violations:
                 lines.append("x DANGER ZONE")
             if "fall" in p.violations:
@@ -438,7 +492,7 @@ class Detector:
                 lines.append("x NO HARNESS AT HEIGHT")
             yy = y1
             for i, line in enumerate(lines):
-                c = col if i == 0 else (RED if line.startswith("x") else GREEN)
+                c = col if i == 0 else (RED if line.startswith("x") else YELLOW if line.startswith("-") else GREEN)
                 yy = _label(out, line, (x1, yy if i == 0 else yy), c, fs, th, below=i > 0)
         return out
 

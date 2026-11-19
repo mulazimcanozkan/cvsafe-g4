@@ -1,7 +1,8 @@
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models.dart';
+import '../theme.dart';
 import '../widgets.dart';
 
 /// Site safety KPIs computed by the server from every AI scan and incident.
@@ -14,7 +15,7 @@ class AnalyticsScreen extends StatefulWidget {
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   static const _ranges = [('today', 'Today'), ('week', 'This Week'), ('month', 'Month')];
-  static const _barColors = [C.orange, C.pink, Color(0xFFFDBA74), C.blue, C.green, C.yellow];
+  static List<Color> get _barColors => [C.orange, C.pink, const Color(0xFFFDBA74), C.blue, C.green, C.yellow];
 
   void _setRange(String r) => AppScope.read(context).loadAnalytics(r);
 
@@ -59,7 +60,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   avatar: r.$1 == 'today'
                       ? Icon(Icons.calendar_today, size: 14, color: range == r.$1 ? Colors.white : C.muted)
                       : null,
-                  label: Text(r.$2, style: mono(size: 12, weight: FontWeight.w700, color: range == r.$1 ? Colors.white : C.text)),
+                  label: Text(tx(r.$2), style: mono(size: 12, weight: FontWeight.w700, color: range == r.$1 ? Colors.white : C.text)),
                   selectedColor: C.orange,
                   backgroundColor: C.panel,
                   side: BorderSide(color: range == r.$1 ? C.orange : C.border),
@@ -72,9 +73,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         if (a == null && st.analyticsError != null)
           Panel(
             child: Column(children: [
-              Text('Could not load analytics: ${st.analyticsError}', style: sans(size: 13, color: C.pink)),
+              Text(tx('Could not load analytics: ${st.analyticsError}'), style: sans(size: 13, color: C.pink)),
               const SizedBox(height: 10),
-              BigButton(label: 'Retry', icon: Icons.refresh, onPressed: () => st.loadAnalytics(range)),
+              BigButton(label: tx('Retry'), icon: Icons.refresh, onPressed: () => st.loadAnalytics(range)),
             ]),
           )
         else if (a == null)
@@ -101,7 +102,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Panel(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: Text('SITE SAFETY COMPLIANCE INDEX', style: mono(size: 11, color: C.muted, weight: FontWeight.w700))),
+          Expanded(child: Text(tx('SITE SAFETY COMPLIANCE INDEX'), style: mono(size: 11, color: C.muted, weight: FontWeight.w700))),
           Pill('GRADE ${a.grade} · ${a.risk.toUpperCase()}', color: color, small: true),
         ]),
         const SizedBox(height: 10),
@@ -109,10 +110,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(a.complianceIndex.round().toString(), style: sans(size: 46, weight: FontWeight.w800)),
+                Text(tx(a.complianceIndex.round().toString()), style: sans(size: 46, weight: FontWeight.w800)),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 9, left: 4),
-                  child: Text('/ 100', style: sans(size: 16, color: C.dim)),
+                  child: Text(tx('/ 100'), style: sans(size: 16, color: C.dim)),
                 ),
               ]),
               if (change != null)
@@ -120,7 +121,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   Icon(change >= 0 ? Icons.trending_up : Icons.trending_down, size: 16, color: change >= 0 ? C.green : C.red),
                   const SizedBox(width: 4),
                   Flexible(
-                    child: Text('${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)} vs previous period',
+                    child: Text(tx('${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)} vs previous period'),
                         style: sans(size: 12.5, color: change >= 0 ? C.green : C.red)),
                   ),
                 ]),
@@ -140,7 +141,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   backgroundColor: C.panel2,
                 ),
               ),
-              Text('${a.complianceIndex.round()}%', style: mono(size: 12, color: color, weight: FontWeight.w700)),
+              Text(tx('${a.complianceIndex.round()}%'), style: mono(size: 12, color: color, weight: FontWeight.w700)),
             ]),
           ),
         ]),
@@ -149,15 +150,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(color: C.panel2, borderRadius: BorderRadius.circular(8)),
           child: Row(children: [
-            const Icon(Icons.emoji_events_outlined, size: 16, color: C.yellow),
+            Icon(Icons.emoji_events_outlined, size: 16, color: C.yellow),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                a.daysSinceCritical == null
+                tx(a.daysSinceCritical == null
                     ? 'NO CRITICAL AI ALERTS RECORDED'
                     : a.daysSinceCritical == 0
                         ? 'CRITICAL AI ALERT RECORDED TODAY'
-                        : '${a.daysSinceCritical} DAYS WITHOUT A CRITICAL AI ALERT',
+                        : '${a.daysSinceCritical} DAYS WITHOUT A CRITICAL AI ALERT'),
                 style: mono(size: 10.5, weight: FontWeight.w700),
               ),
             ),
@@ -172,13 +173,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           padding: const EdgeInsets.all(12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Expanded(child: Text(label, style: mono(size: 9.5, color: C.muted, weight: FontWeight.w700))),
+              Expanded(child: Text(tx(label), style: mono(size: 9.5, color: C.muted, weight: FontWeight.w700))),
               Icon(icon, size: 16, color: iconColor),
             ]),
             const SizedBox(height: 6),
-            Text(value, style: mono(size: 21, weight: FontWeight.w800, color: iconColor == C.red ? C.pink : C.text)),
+            Text(tx(value), style: mono(size: 21, weight: FontWeight.w800, color: iconColor == C.red ? C.pink : C.text)),
             const SizedBox(height: 2),
-            Text(sub, style: mono(size: 10, color: C.green)),
+            Text(tx(sub), style: mono(size: 10, color: C.green)),
           ]),
         ),
       );
@@ -207,9 +208,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _breakdown(Analytics a) => Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SectionTitle('Violation Breakdown', icon: Icons.pie_chart_outline,
-              trailing: Text('TOTAL: ${a.totalEvents} EVENTS', style: mono(size: 10.5, color: C.muted))),
+              trailing: Text(tx('TOTAL: ${a.totalEvents} EVENTS'), style: mono(size: 10.5, color: C.muted))),
           if (a.breakdown.isEmpty)
-            Text('No violations in this period.', style: sans(size: 13, color: C.muted))
+            Text(tx('No violations in this period.'), style: sans(size: 13, color: C.muted))
           else ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
@@ -235,11 +236,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(a.breakdown[i].title, style: sans(size: 14, weight: FontWeight.w600)),
-                      Text(a.breakdown[i].topLocation, style: mono(size: 10.5, color: C.muted)),
+                      Text(tx(a.breakdown[i].title), style: sans(size: 14, weight: FontWeight.w600)),
+                      Text(tx(a.breakdown[i].topLocation), style: mono(size: 10.5, color: C.muted)),
                     ]),
                   ),
-                  Text('${(a.breakdown[i].share * 100).round()}% (${a.breakdown[i].count})',
+                  Text(tx('${(a.breakdown[i].share * 100).round()}% (${a.breakdown[i].count})'),
                       style: mono(size: 11.5, color: _barColors[i % _barColors.length], weight: FontWeight.w700)),
                 ]),
               ),
@@ -250,7 +251,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _leaderboard(Analytics a) => Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SectionTitle('Subcontractor Leaderboard', icon: Icons.groups_outlined,
-              trailing: Text('SHIFT AUDIT', style: mono(size: 10.5, color: C.blue))),
+              trailing: Text(tx('SHIFT AUDIT'), style: mono(size: 10.5, color: C.blue))),
           for (var i = 0; i < a.leaderboard.length; i++) _leaderRow(i + 1, a.leaderboard[i]),
         ]),
       );
@@ -271,13 +272,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           CircleAvatar(
             radius: 12,
             backgroundColor: alpha(color, 0.2),
-            child: Text('$rank', style: mono(size: 11, color: color, weight: FontWeight.w800)),
+            child: Text(tx('$rank'), style: mono(size: 11, color: color, weight: FontWeight.w800)),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(l.name, style: sans(size: 14.5, weight: FontWeight.w700)),
-              Text('${l.workers} workers on site · ${l.trade}', style: mono(size: 10.5, color: C.muted)),
+              Text(tx(l.name), style: sans(size: 14.5, weight: FontWeight.w700)),
+              Text(tx('${l.workers} workers on site · ${l.trade}'), style: mono(size: 10.5, color: C.muted)),
             ]),
           ),
           Pill(label, color: color, small: true),
@@ -296,7 +297,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          Text(l.compliance == null ? '-' : '${l.compliance!.round()}%',
+          Text(tx(l.compliance == null ? '-' : '${l.compliance!.round()}%'),
               style: mono(size: 12, color: color, weight: FontWeight.w700)),
         ]),
       ]),
@@ -306,7 +307,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _legal(Analytics a, String mode) => Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SectionTitle('Legal & Regulatory Audit', icon: Icons.policy_outlined),
-          Text('TURKISH OHS LAW NO. 6331 & KVKK COMPLIANCE', style: mono(size: 10.5, color: C.muted)),
+          Text(tx('TURKISH OHS LAW NO. 6331 & KVKK COMPLIANCE'), style: mono(size: 10.5, color: C.muted)),
           const SizedBox(height: 12),
           _legalRow(Icons.rule, 'Evidence trail', 'Every alert stored with timestamp, camera and response',
               Icons.check_circle, C.green),
@@ -315,7 +316,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           _legalRow(Icons.memory, 'Detection model', mode == 'ppe-model' ? 'Trained PPE model active' : 'Baseline PPE check (train PPE model)',
               mode == 'ppe-model' ? Icons.check_circle : Icons.info_outline, mode == 'ppe-model' ? C.green : C.yellow),
           const SizedBox(height: 6),
-          BigButton(label: 'Download Safety Report (PDF)', icon: Icons.picture_as_pdf_outlined, onPressed: _openReport),
+          BigButton(label: tx('Download Safety Report (PDF)'), icon: Icons.picture_as_pdf_outlined, onPressed: _openReport),
         ]),
       );
 
@@ -328,8 +329,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: sans(size: 13.5, weight: FontWeight.w600)),
-              Text(sub, style: mono(size: 10.5, color: C.muted)),
+              Text(tx(title), style: sans(size: 13.5, weight: FontWeight.w600)),
+              Text(tx(sub), style: mono(size: 10.5, color: C.muted)),
             ]),
           ),
           Icon(trail, color: color, size: 20),

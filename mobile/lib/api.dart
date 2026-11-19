@@ -8,30 +8,24 @@ import 'models.dart';
 
 class ApiException implements Exception {
   final String message;
-  /// HTTP status code, or null for client-side errors.
-  final int? statusCode;
-  ApiException(this.message, {this.statusCode});
+  ApiException(this.message);
   @override
   String toString() => message;
 }
 
 /// Thrown on HTTP 401: the session is missing or expired, so the app shows the login screen.
 class AuthException extends ApiException {
-  AuthException(super.message) : super(statusCode: 401);
+  AuthException(super.message);
 }
 
 /// Thin client for the CVSAFE FastAPI backend (used by the mobile app and the web panel).
 class ApiClient {
-  /// [httpClient] can be replaced in tests (e.g. `MockClient` from `package:http/testing.dart`).
-  /// [onUnauthorized] is called on every HTTP 401, before the [AuthException] is thrown.
-  ApiClient(String baseUrl, {this.token, http.Client? httpClient, this.onUnauthorized})
-      : baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
-        _http = httpClient ?? http.Client();
+  ApiClient(String baseUrl, {this.token})
+      : baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
   final String baseUrl;
   String? token;
-  final void Function()? onUnauthorized;
-  final http.Client _http;
+  final http.Client _http = http.Client();
   static const _short = Duration(seconds: 10);
 
   String url(String path) => path.startsWith('http') ? path : '$baseUrl$path';
@@ -69,11 +63,8 @@ class ApiClient {
           msg = det is List && det.isNotEmpty && det.first is Map ? (det.first['msg'] ?? det.toString()).toString() : det.toString();
         }
       } catch (_) {}
-      if (r.statusCode == 401) {
-        onUnauthorized?.call();
-        throw AuthException(msg);
-      }
-      throw ApiException(msg, statusCode: r.statusCode);
+      if (r.statusCode == 401) throw AuthException(msg);
+      throw ApiException(msg);
     }
     if (text.isEmpty) return null;
     return jsonDecode(text);
@@ -107,14 +98,6 @@ class ApiClient {
       UserInfo.fromJson(_map(await _post('/users', {'username': username, 'name': name, 'role': role, 'password': password})));
 
   Future<void> deleteUser(int id) => _send('DELETE', '/users/$id');
-
-  /// Partial update (admin only): omitted values stay unchanged. Deactivation revokes the user's sessions.
-  Future<UserInfo> updateUser(int id, {String? name, String? role, bool? isActive}) async =>
-      UserInfo.fromJson(_map(await _send('PATCH', '/users/$id', {
-        if (name != null) 'name': name,
-        if (role != null) 'role': role,
-        if (isActive != null) 'is_active': isActive,
-      })));
 
   Future<void> resetPassword(int id, String password) => _post('/users/$id/password', {'password': password});
 
@@ -160,17 +143,11 @@ class ApiClient {
   Future<Incident> acknowledge(int id, {String? note}) async =>
       Incident.fromJson(_map(await _post('/incidents/$id/ack', {'note': note})));
 
-  /// Marks an alert as a false alarm. [reason] is a code from [falseAlarmReasons]; the server
-  /// stores `other` when it is omitted.
-  Future<Incident> falseAlarm(int id, {String? reason, String? note}) async => Incident.fromJson(
-      _map(await _post('/incidents/$id/false_alarm', {if (reason != null) 'reason': reason, 'note': note})));
+  Future<Incident> falseAlarm(int id, {String? note}) async =>
+      Incident.fromJson(_map(await _post('/incidents/$id/false_alarm', {'note': note})));
 
-  Future<List<FalseAlarmReason>> falseAlarmReasons() async => (await _get('/false_alarm_reasons') as List)
-      .map((e) => FalseAlarmReason.fromJson(_map(e)))
-      .toList();
-
-  Future<Incident> action(int id, String kind, {String? note}) async =>
-      Incident.fromJson(_map(await _post('/incidents/$id/action', {'kind': kind, if (note != null) 'note': note})));
+  Future<Incident> action(int id, String kind) async =>
+      Incident.fromJson(_map(await _post('/incidents/$id/action', {'kind': kind})));
 
   Future<Analytics> analytics(String range) async => Analytics.fromJson(_map(await _get('/analytics?range=$range')));
 

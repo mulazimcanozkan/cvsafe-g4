@@ -1,9 +1,10 @@
 import 'dart:async';
 
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 
+import '../models.dart';
 import '../state.dart';
+import '../theme.dart';
 import '../widgets.dart';
 
 /// Live CCTV: the latest AI-annotated frame from each camera (refreshed every
@@ -55,9 +56,9 @@ class _LiveScreenState extends State<LiveScreen> {
     final st = AppScope.of(context);
     final cams = st.site?.cameras ?? const <Camera>[];
     if (cams.isEmpty) {
-      return ListView(padding: const EdgeInsets.all(16), children: const [
+      return ListView(padding: const EdgeInsets.all(16), children: [
         OfflineBanner(),
-        EmptyState(icon: Icons.videocam_off_outlined, title: 'No cameras configured', text: 'Cameras are added on the web portal.'),
+        EmptyState(icon: Icons.videocam_off_outlined, title: tx('No cameras configured'), text: tx('Cameras are added on the web portal.')),
       ]);
     }
     final selected = cams.firstWhere((c) => c.id == st.selectedCameraId, orElse: () => cams.first);
@@ -71,7 +72,7 @@ class _LiveScreenState extends State<LiveScreen> {
             Dot(color: (h?.streamsActive ?? 0) > 0 ? C.green : C.dim),
             const SizedBox(width: 8),
             Expanded(
-              child: Text('${h?.streamsActive ?? 0}/${cams.length} RTSP STREAMS ACTIVE',
+              child: Text(tx('${h?.streamsActive ?? 0}/${cams.length} RTSP STREAMS ACTIVE'),
                   style: mono(size: 11.5, color: C.green, weight: FontWeight.w700)),
             ),
             Pill('${cams.fold<int>(0, (n, c) => n + c.zones.length)} GEOFENCES ARMED', color: C.muted, icon: Icons.shield_outlined, small: true),
@@ -121,7 +122,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   selected: c.id == selected.id,
                   onSelected: (_) => setState(() => st.selectedCameraId = c.id),
                   showCheckmark: false,
-                  label: Text(c.zones.isNotEmpty ? c.zones.first.name : c.name,
+                  label: Text(tx(c.zones.isNotEmpty ? c.zones.first.name : c.name),
                       style: mono(size: 11.5, weight: FontWeight.w700, color: c.id == selected.id ? Colors.white : C.text)),
                   selectedColor: C.orange,
                   backgroundColor: C.panel,
@@ -154,15 +155,15 @@ class _LiveScreenState extends State<LiveScreen> {
             Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('TARGET ANCHOR', style: mono(size: 10, color: C.muted, weight: FontWeight.w700)),
-                  Text(selected.name, style: sans(size: 17, weight: FontWeight.w600)),
-                  if (selected.subcontractor != null) Text(selected.subcontractor!, style: mono(size: 10.5, color: C.muted)),
+                  Text(tx('TARGET ANCHOR'), style: mono(size: 10, color: C.muted, weight: FontWeight.w700)),
+                  Text(tx(selected.name), style: sans(size: 17, weight: FontWeight.w600)),
+                  if (selected.subcontractor != null) Text(tx(selected.subcontractor!), style: mono(size: 10.5, color: C.muted)),
                 ]),
               ),
               SizedBox(
                 width: 130,
                 child: BigButton(
-                  label: 'Sound Siren',
+                  label: tx('Sound Siren'),
                   icon: Icons.volume_up_outlined,
                   color: C.red,
                   onPressed: selected.openViolations > 0 || st.openIncidents.any((i) => i.cameraId == selected.id)
@@ -176,10 +177,10 @@ class _LiveScreenState extends State<LiveScreen> {
         const SizedBox(height: 14),
         Row(children: [
           Expanded(
-            child: Text('FEED SWITCHER (${cams.length - 1} OTHER STREAMS)',
+            child: Text(tx('FEED SWITCHER (${cams.length - 1} OTHER STREAMS)'),
                 style: mono(size: 11.5, weight: FontWeight.w700)),
           ),
-          Text('Swipe or select', style: mono(size: 10.5, color: C.blue)),
+          Text(tx('Swipe or select'), style: mono(size: 10.5, color: C.blue)),
         ]),
         const SizedBox(height: 8),
         SizedBox(
@@ -205,8 +206,8 @@ class _LiveScreenState extends State<LiveScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(color: C.panel2, borderRadius: BorderRadius.circular(10)),
         child: Row(children: [
-          Expanded(child: Text(label, style: mono(size: 10.5, color: C.muted))),
-          Text(value, style: mono(size: 12, color: C.green, weight: FontWeight.w700)),
+          Expanded(child: Text(tx(label), style: mono(size: 10.5, color: C.muted))),
+          Text(tx(value), style: mono(size: 12, color: C.green, weight: FontWeight.w700)),
         ]),
       );
 
@@ -223,7 +224,7 @@ class _LiveScreenState extends State<LiveScreen> {
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Icon(icon, size: 18, color: active ? Colors.white : C.muted),
               const SizedBox(width: 6),
-              Text(label, style: mono(size: 12, weight: FontWeight.w700, color: active ? Colors.white : C.text)),
+              Text(tx(label), style: mono(size: 12, weight: FontWeight.w700, color: active ? Colors.white : C.text)),
             ]),
           ),
         ),
@@ -265,11 +266,11 @@ class _LiveScreenState extends State<LiveScreen> {
             Positioned(right: 6, bottom: 6, child: Pill('${c.persons} Workers', color: C.text, small: true)),
         ]),
         const SizedBox(height: 6),
-        Text(c.name, style: sans(size: 13.5, weight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text(tx(c.name), style: sans(size: 13.5, weight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
         Row(children: [
           Dot(color: c.openViolations > 0 ? C.orange : C.green, size: 7),
           const SizedBox(width: 5),
-          Text(c.openViolations > 0 ? '${c.openViolations} Open Violations' : 'Normal · 0 Violations',
+          Text(tx(c.openViolations > 0 ? '${c.openViolations} Open Violations' : 'Normal · 0 Violations'),
               style: mono(size: 10, color: c.openViolations > 0 ? C.orange : C.green)),
         ]),
       ]);
@@ -280,12 +281,12 @@ class _LiveScreenState extends State<LiveScreen> {
             const Icon(Icons.shield_outlined, color: C.orange),
             const SizedBox(width: 8),
             Expanded(
-              child: Text('Virtual Geofence Zones (${cam.zones.length})', style: sans(size: 16, weight: FontWeight.w700)),
+              child: Text(tx('Virtual Geofence Zones (${cam.zones.length})'), style: sans(size: 16, weight: FontWeight.w700)),
             ),
             Pill('SYNCED', color: C.green, small: true),
           ]),
           const SizedBox(height: 10),
-          if (cam.zones.isEmpty) Text('No zones defined for ${cam.id}.', style: sans(size: 13, color: C.muted)),
+          if (cam.zones.isEmpty) Text(tx('No zones defined for ${cam.id}.'), style: sans(size: 13, color: C.muted)),
           for (final z in cam.zones)
             Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -302,8 +303,8 @@ class _LiveScreenState extends State<LiveScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(z.name, style: mono(size: 12.5, weight: FontWeight.w700)),
-                    Text(z.type == 'restricted' ? 'Restricted · any entry raises an alert' : 'Work at height · harness required',
+                    Text(tx(z.name), style: mono(size: 12.5, weight: FontWeight.w700)),
+                    Text(tx(z.type == 'restricted' ? 'Restricted · any entry raises an alert' : 'Work at height · harness required'),
                         style: sans(size: 12, color: C.muted)),
                   ]),
                 ),
@@ -311,10 +312,10 @@ class _LiveScreenState extends State<LiveScreen> {
             ),
           const SizedBox(height: 4),
           Row(children: [
-            const Icon(Icons.laptop_mac, size: 15, color: C.muted),
+            Icon(Icons.laptop_mac, size: 15, color: C.muted),
             const SizedBox(width: 8),
             Expanded(
-              child: Text('Drawing and calibrating zones is done on the web portal.',
+              child: Text(tx('Drawing and calibrating zones is done on the web portal.'),
                   style: sans(size: 12, color: C.muted)),
             ),
           ]),

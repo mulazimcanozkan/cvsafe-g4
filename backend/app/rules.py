@@ -23,6 +23,30 @@ VIOLATIONS = {
         "category": "height",
         "reference": "Yapi Isleri ISG Yonetmeligi Ek-4 (yuksekte calisma)",
     },
+    "no_gloves": {
+        "title": "Missing Safety Gloves",
+        "severity": "moderate",
+        "category": "ppe",
+        "reference": "KKD Yonetmeligi (2013) / 6331 s. Kanun Md. 4",
+    },
+    "no_goggles": {
+        "title": "Missing Safety Goggles",
+        "severity": "moderate",
+        "category": "ppe",
+        "reference": "KKD Yonetmeligi (2013) / 6331 s. Kanun Md. 4",
+    },
+    "no_boots": {
+        "title": "Missing Safety Boots",
+        "severity": "moderate",
+        "category": "ppe",
+        "reference": "KKD Yonetmeligi (2013) / 6331 s. Kanun Md. 4",
+    },
+    "no_mask": {
+        "title": "Missing Mask",
+        "severity": "moderate",
+        "category": "ppe",
+        "reference": "KKD Yonetmeligi (2013) / 6331 s. Kanun Md. 4",
+    },
     "zone_breach": {
         "title": "Danger Zone Breach",
         "severity": "critical",
@@ -44,23 +68,6 @@ VIOLATIONS = {
 }
 
 SEVERITY_RANK = {"critical": 3, "high": 2, "moderate": 1, "low": 0}
-
-# Reasons selectable when an alert is marked as a false alarm (FR-13, NFR-04).
-# Mirrors the `false_alarm_reasons` lookup table of the database design.
-FALSE_ALARM_REASONS = {
-    "wrong_detection": "Wrong detection",
-    "authorised_person": "Authorised person in the zone",
-    "reflection_shadow": "Reflection or shadow",
-    "other": "Other",
-}
-DEFAULT_FALSE_ALARM_REASON = "other"
-
-# Allowed incident status changes (BR-02): there is no way back to "open".
-STATUS_TRANSITIONS = {
-    "open": {"acknowledged", "false_alarm"},
-    "acknowledged": {"false_alarm"},
-    "false_alarm": set(),
-}
 
 
 def incident_title(types):

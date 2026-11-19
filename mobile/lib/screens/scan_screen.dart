@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../models.dart';
+import '../theme.dart';
 import '../widgets.dart';
 
 /// AI Scan: analyse a photo or video taken in the field with the same models
@@ -132,12 +133,12 @@ class _ScanScreenState extends State<ScanScreen> {
           Row(children: [
             const Icon(Icons.document_scanner_outlined, color: C.orange),
             const SizedBox(width: 8),
-            Expanded(child: Text('AI Photo & Video Analysis', style: sans(size: 17, weight: FontWeight.w700))),
+            Expanded(child: Text(tx('AI Photo & Video Analysis'), style: sans(size: 17, weight: FontWeight.w700))),
           ]),
           const SizedBox(height: 6),
           Text(
-              'Detects workers, hard hats, hi-vis vests, danger-zone entry, possible falls and machinery proximity. '
-              'Faces are blurred before anything is stored (KVKK).',
+              tx('Detects workers, hard hats, hi-vis vests, danger-zone entry, possible falls and machinery proximity. '
+              'Faces are blurred before anything is stored (KVKK).'),
               style: sans(size: 12.5, color: C.muted, height: 1.4)),
           const SizedBox(height: 14),
           Row(children: [
@@ -152,7 +153,7 @@ class _ScanScreenState extends State<ScanScreen> {
             Expanded(child: _source(Icons.video_library_outlined, 'Video from Gallery', () => _pickVideo(ImageSource.gallery))),
           ]),
           const SizedBox(height: 14),
-          Text('ASSIGN TO CAMERA / ZONE', style: mono(size: 10.5, color: C.muted, weight: FontWeight.w700)),
+          Text(tx('ASSIGN TO CAMERA / ZONE'), style: mono(size: 10.5, color: C.muted, weight: FontWeight.w700)),
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -164,11 +165,11 @@ class _ScanScreenState extends State<ScanScreen> {
                 dropdownColor: C.panel2,
                 style: mono(size: 12.5),
                 items: [
-                  DropdownMenuItem<String?>(value: null, child: Text('None (no zone rules)', style: mono(size: 12.5))),
+                  DropdownMenuItem<String?>(value: null, child: Text(tx('None (no zone rules)'), style: mono(size: 12.5))),
                   for (final c in cams)
                     DropdownMenuItem<String?>(
                       value: c.id,
-                      child: Text('${c.id} · ${c.name}${c.zones.isEmpty ? '' : ' (${c.zones.length} zone)'}',
+                      child: Text(tx('${c.id} · ${c.name}${c.zones.isEmpty ? '' : ' (${c.zones.length} zone)'}'),
                           overflow: TextOverflow.ellipsis, style: mono(size: 12.5)),
                     ),
                 ],
@@ -180,10 +181,10 @@ class _ScanScreenState extends State<ScanScreen> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: createAlerts,
-            activeThumbColor: C.orange,
+            activeColor: C.orange,
             onChanged: busy ? null : (v) => setState(() => createAlerts = v),
-            title: Text('Create alerts for violations', style: sans(size: 13.5)),
-            subtitle: Text('Off = analyse only, nothing is logged', style: sans(size: 11.5, color: C.muted)),
+            title: Text(tx('Create alerts for violations'), style: sans(size: 13.5)),
+            subtitle: Text(tx('Off = analyse only, nothing is logged'), style: sans(size: 11.5, color: C.muted)),
           ),
         ]),
       ),
@@ -196,7 +197,7 @@ class _ScanScreenState extends State<ScanScreen> {
           child: Row(children: [
             const Icon(Icons.error_outline, color: C.red),
             const SizedBox(width: 10),
-            Expanded(child: Text(error!, style: sans(size: 13, color: C.pink))),
+            Expanded(child: Text(tx(error!), style: sans(size: 13, color: C.pink))),
           ]),
         ),
       if (imageResult != null) ..._imageResult(imageResult!),
@@ -216,7 +217,7 @@ class _ScanScreenState extends State<ScanScreen> {
             child: Column(children: [
               Icon(icon, color: busy ? C.dim : C.orange, size: 26),
               const SizedBox(height: 6),
-              Text(label, textAlign: TextAlign.center, style: mono(size: 11.5, weight: FontWeight.w700)),
+              Text(tx(label), textAlign: TextAlign.center, style: mono(size: 11.5, weight: FontWeight.w700)),
             ]),
           ),
         ),
@@ -238,11 +239,11 @@ class _ScanScreenState extends State<ScanScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  stage == 'uploading'
+                  tx(stage == 'uploading'
                       ? 'Uploading video...'
                       : progress == null
                           ? 'Running YOLO detection...'
-                          : 'Analysing frames · ${(progress! * 100).round()}%',
+                          : 'Analysing frames · ${(progress! * 100).round()}%'),
                   style: mono(size: 12.5, weight: FontWeight.w600),
                 ),
               ),
@@ -263,9 +264,9 @@ class _ScanScreenState extends State<ScanScreen> {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(color: C.panel2, borderRadius: BorderRadius.circular(10)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: mono(size: 9.5, color: C.muted, weight: FontWeight.w700)),
+            Text(tx(label), style: mono(size: 9.5, color: C.muted, weight: FontWeight.w700)),
             const SizedBox(height: 4),
-            Text(value, style: mono(size: 18, color: color, weight: FontWeight.w800)),
+            Text(tx(value), style: mono(size: 18, color: color, weight: FontWeight.w800)),
           ]),
         ),
       );
@@ -273,9 +274,9 @@ class _ScanScreenState extends State<ScanScreen> {
   Widget _modeNote(String mode) => Padding(
         padding: const EdgeInsets.only(top: 10),
         child: Text(
-          mode == 'ppe-model'
+          tx(mode == 'ppe-model'
               ? 'Model: YOLO pose + trained PPE detector.'
-              : 'Model: YOLO pose + colour baseline for PPE. Accuracy improves once the trained PPE model is installed on the server.',
+              : 'Model: YOLO pose + colour baseline for PPE. Accuracy improves once the trained PPE model is installed on the server.'),
           style: sans(size: 11.5, color: C.muted, height: 1.35),
         ),
       );
@@ -317,7 +318,7 @@ class _ScanScreenState extends State<ScanScreen> {
           ..._violationPills(r.violations),
           if (r.vehicles.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text('Machinery detected: ${r.vehicles.join(', ')}', style: sans(size: 12, color: C.yellow)),
+            Text(tx('Machinery detected: ${r.vehicles.join(', ')}'), style: sans(size: 12, color: C.yellow)),
           ],
           _modeNote(r.mode),
         ]),
@@ -326,7 +327,7 @@ class _ScanScreenState extends State<ScanScreen> {
       if (r.persons.isNotEmpty)
         Panel(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('PER-WORKER CHECK', style: mono(size: 12, weight: FontWeight.w700, color: C.blue)),
+            Text(tx('PER-WORKER CHECK'), style: mono(size: 12, weight: FontWeight.w700, color: C.blue)),
             const SizedBox(height: 10),
             for (final p in r.persons) _personRow(p),
           ]),
@@ -334,7 +335,7 @@ class _ScanScreenState extends State<ScanScreen> {
       if (r.incidentIds.isNotEmpty) ...[
         const SizedBox(height: 12),
         BigButton(
-          label: 'Open ${r.incidentIds.length} alert${r.incidentIds.length > 1 ? 's' : ''} in Evidence',
+          label: tx('Open ${r.incidentIds.length} alert${r.incidentIds.length > 1 ? 's' : ''} in Evidence'),
           icon: Icons.open_in_new,
           onPressed: () => st.openEvidence(r.incidentIds.first),
         ),
@@ -348,8 +349,9 @@ class _ScanScreenState extends State<ScanScreen> {
       if (s == null || s.state == null) {
         return Pill('$label ?', color: C.dim, small: true);
       }
-      return Pill('${s.state! ? '✓' : '✗'} $label ${(s.conf * 100).round()}%',
-          color: s.state! ? C.green : C.red, small: true);
+      // a missing optional item (not required on this site) is shown in yellow, not as a violation
+      final colour = s.state! ? C.green : (s.required == false ? C.yellow : C.red);
+      return Pill('${s.state! ? '✓' : '✗'} $label ${(s.conf * 100).round()}%', color: colour, small: true);
     }
 
     return Container(
@@ -362,20 +364,25 @@ class _ScanScreenState extends State<ScanScreen> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Text('[W-${p.id}]', style: mono(size: 12.5, weight: FontWeight.w800)),
+          Text(tx('[W-${p.id}]'), style: mono(size: 12.5, weight: FontWeight.w800)),
           const SizedBox(width: 8),
-          Text(p.violations.isEmpty ? 'PASS' : 'VIOLATION',
+          Text(tx(p.violations.isEmpty ? 'PASS' : 'VIOLATION'),
               style: mono(size: 11.5, weight: FontWeight.w700, color: p.violations.isEmpty ? C.green : C.red)),
           const Spacer(),
-          Text('person ${(p.conf * 100).round()}%', style: mono(size: 10.5, color: C.muted)),
+          Text(tx('person ${(p.conf * 100).round()}%'), style: mono(size: 10.5, color: C.muted)),
         ]),
         const SizedBox(height: 8),
         Wrap(spacing: 6, runSpacing: 6, children: [
-          item('hardhat', 'HARD HAT'),
-          item('vest', 'VEST'),
-          item('harness', 'HARNESS'),
+          item('hardhat', tx('HARD HAT')),
+          item('vest', tx('VEST')),
+          item('harness', tx('HARNESS')),
+          if (p.ppe.containsKey('gloves')) item('gloves', tx('GLOVES')),
+          if (p.ppe.containsKey('goggles')) item('goggles', tx('GOGGLES')),
+          if (p.ppe.containsKey('boots')) item('boots', tx('BOOTS')),
+          if (p.ppe.containsKey('mask')) item('mask', tx('MASK')),
           for (final z in p.zones) Pill('ZONE: $z', color: C.orange, small: true),
-          for (final v in p.violations.where((v) => !{'no_hardhat', 'no_vest'}.contains(v)))
+          for (final v in p.violations
+              .where((v) => !{'no_hardhat', 'no_vest', 'no_gloves', 'no_goggles', 'no_boots', 'no_mask'}.contains(v)))
             Pill(violationLabels[v] ?? v, color: C.red, small: true),
         ]),
       ]),
@@ -391,8 +398,8 @@ class _ScanScreenState extends State<ScanScreen> {
           SectionTitle('Video Result', icon: Icons.movie_filter_outlined,
               trailing: Pill('${r.framesAnalyzed} frames', color: C.blue, small: true)),
           Text(
-              'Analysed ${r.analyzedS.toStringAsFixed(1)}s of ${r.durationS.toStringAsFixed(1)}s · '
-              '${r.sampleFps.toStringAsFixed(1)} fps sampling · ${r.latencyMs.round()} ms/frame',
+              tx('Analysed ${r.analyzedS.toStringAsFixed(1)}s of ${r.durationS.toStringAsFixed(1)}s · '
+              '${r.sampleFps.toStringAsFixed(1)} fps sampling · ${r.latencyMs.round()} ms/frame'),
               style: mono(size: 11, color: C.muted)),
           const SizedBox(height: 12),
           Row(children: [
@@ -405,7 +412,7 @@ class _ScanScreenState extends State<ScanScreen> {
           ..._violationPills(r.violations),
           Padding(
             padding: const EdgeInsets.only(top: 10),
-            child: Text('A violation is reported only if it persists on the same tracked worker for several frames.',
+            child: Text(tx('A violation is reported only if it persists on the same tracked worker for several frames.'),
                 style: sans(size: 11.5, color: C.muted)),
           ),
           _modeNote(r.mode),
@@ -430,15 +437,15 @@ class _ScanScreenState extends State<ScanScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('at ${_fmtOffset(i.tOffset)} · Worker #W-${i.trackId}',
+                      Text(tx('at ${_fmtOffset(i.tOffset)} · Worker #W-${i.trackId}'),
                           style: mono(size: 10.5, color: C.blue, weight: FontWeight.w600)),
                       const SizedBox(height: 4),
-                      Text(i.title, style: sans(size: 14, weight: FontWeight.w700)),
+                      Text(tx(i.title), style: sans(size: 14, weight: FontWeight.w700)),
                       const SizedBox(height: 4),
                       Pill(i.severity.toUpperCase(), color: severityColor(i.severity), small: true),
                     ]),
                   ),
-                  if (i.incidentId != null) const Icon(Icons.chevron_right, color: C.muted),
+                  if (i.incidentId != null) Icon(Icons.chevron_right, color: C.muted),
                 ]),
               ),
             ),

@@ -1,6 +1,7 @@
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 
+import 'api.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Shared login screen for the mobile app and the web panel.
@@ -59,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   InputDecoration _dec(String label, IconData icon, {Widget? suffix}) => InputDecoration(
-        labelText: label,
+        labelText: txn(label),
         labelStyle: sans(size: 13, color: C.muted),
         prefixIcon: Icon(icon, color: C.muted, size: 20),
         suffixIcon: suffix,
@@ -79,6 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: widget.wide ? 440 : 400),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                const Align(alignment: Alignment.centerRight, child: UiToggles()),
                 Center(
                   child: Container(
                     width: 64,
@@ -88,14 +90,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Text('CVSAFE', textAlign: TextAlign.center, style: mono(size: 26, weight: FontWeight.w800, color: C.orange)),
-                Text(widget.subtitle, textAlign: TextAlign.center, style: sans(size: 14, color: C.muted)),
+                Text(tx('CVSAFE'), textAlign: TextAlign.center, style: mono(size: 26, weight: FontWeight.w800, color: C.orange)),
+                Text(tx(widget.subtitle), textAlign: TextAlign.center, style: sans(size: 14, color: C.muted)),
                 const SizedBox(height: 26),
                 Panel(
                   padding: const EdgeInsets.all(18),
                   child: AutofillGroup(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      Text('Sign in', style: sans(size: 18, weight: FontWeight.w700)),
+                      Text(tx('Sign in'), style: sans(size: 18, weight: FontWeight.w700)),
                       const SizedBox(height: 14),
                       TextField(
                         controller: _url,
@@ -126,24 +128,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),
-                        Text(_error!, style: sans(size: 12.5, color: C.pink)),
+                        Text(tx(_error!), style: sans(size: 12.5, color: C.pink)),
                       ],
                       const SizedBox(height: 16),
-                      BigButton(label: 'Sign In', icon: Icons.login, busy: _busy, onPressed: _submit),
+                      BigButton(label: tx('Sign In'), icon: Icons.login, busy: _busy, onPressed: _submit),
                     ]),
                   ),
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  st.online
+                  tx(st.online
                       ? 'Server reachable · ask your administrator for an account.'
-                      : 'Server not reachable yet. Start the CVSAFE server and check the address.',
+                      : 'Server not reachable yet. Start the CVSAFE server and check the address.'),
                   textAlign: TextAlign.center,
                   style: sans(size: 12, color: st.online ? C.green : C.yellow),
                 ),
-                const SizedBox(height: 6),
-                Text('First run: admin / cvsafe123 (change it after signing in)',
-                    textAlign: TextAlign.center, style: mono(size: 10.5, color: C.dim)),
               ]),
             ),
           ),

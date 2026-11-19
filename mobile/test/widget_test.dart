@@ -1,4 +1,5 @@
-import 'package:cvsafe_core/cvsafe_core.dart';
+import 'package:cvsafe_mobile/demo.dart';
+import 'package:cvsafe_mobile/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -72,35 +73,9 @@ void main() {
     expect(r.incidentIds, [5]);
   });
 
-  test('parses the false-alarm reason and the allowed status changes (BR-02)', () {
-    Incident make(String status, [String? reason]) => Incident.fromJson(
-        {'id': 1, 'created_at': 1.0, 'status': status, 'false_alarm_reason': reason, 'types': ['no_vest']});
-    expect(make('open').canAcknowledge, isTrue);
-    expect(make('open').canMarkFalseAlarm, isTrue);
-    expect(make('acknowledged').canAcknowledge, isFalse);
-    expect(make('acknowledged').canMarkFalseAlarm, isTrue);
-    final fa = make('false_alarm', 'reflection_shadow');
-    expect(fa.canAcknowledge || fa.canMarkFalseAlarm, isFalse);
-    expect(fa.falseAlarmReason, 'reflection_shadow');
-  });
-
-  test('parses user activity fields with defaults for older servers', () {
-    final u = UserInfo.fromJson({'id': 3, 'username': 'isg', 'name': 'ISG', 'role': 'ohs',
-        'is_active': false, 'last_login_at': 1700000000.5});
-    expect(u.isActive, isFalse);
-    expect(u.lastLoginAt, 1700000000.5);
-    expect(UserInfo.fromJson(u.toJson()).isActive, isFalse);
-    final old = UserInfo.fromJson({'id': 1, 'username': 'admin', 'name': 'A', 'role': 'admin'});
-    expect(old.isActive, isTrue);
-    expect(old.lastLoginAt, isNull);
-  });
-
-  test('zone copyWith deep-copies the polygon', () {
-    final z = Zone('a', 'Pit', 'restricted', [[0.1, 0.1], [0.5, 0.1], [0.5, 0.5]]);
-    final c = z.copyWith(name: 'Pit East');
-    c.polygon[0][0] = 0.9;
-    expect(z.polygon[0][0], 0.1);
-    expect(c.name, 'Pit East');
-    expect(c.id, 'a');
+  test('demo data is consistent', () {
+    expect(DemoData.incidents(), isNotEmpty);
+    expect(DemoData.site().cameras.length, 4);
+    expect(DemoData.analytics().leaderboard, isNotEmpty);
   });
 }

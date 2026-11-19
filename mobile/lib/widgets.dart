@@ -1,8 +1,7 @@
-// Mobile-specific widgets bound to [AppState]. Shared, state-free widgets live in cvsafe_core.
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 
 import 'state.dart';
+import 'theme.dart';
 
 /// Gives every widget access to [AppState] and rebuilds dependants on change.
 class AppScope extends InheritedNotifier<AppState> {
@@ -11,6 +10,35 @@ class AppScope extends InheritedNotifier<AppState> {
   static AppState of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<AppScope>()!.notifier!;
 
   static AppState read(BuildContext context) => context.getInheritedWidgetOfExactType<AppScope>()!.notifier!;
+}
+
+// ------------------------------------------------------------------ helpers
+String timeAgo(double ts) {
+  final s = (DateTime.now().millisecondsSinceEpoch / 1000 - ts).round();
+  if (s < 0) return tx('now');
+  if (s < 60) return tx('${s}s ago');
+  if (s < 3600) return tx('${s ~/ 60}m ago');
+  if (s < 86400) return tx('${s ~/ 3600}h ago');
+  return tx('${s ~/ 86400}d ago');
+}
+
+String clock(double ts) {
+  final d = DateTime.fromMillisecondsSinceEpoch((ts * 1000).round());
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(d.hour)}:${two(d.minute)}:${two(d.second)}';
+}
+
+String dateTime(double ts) {
+  final d = DateTime.fromMillisecondsSinceEpoch((ts * 1000).round());
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(d.day)}.${two(d.month)}.${d.year} ${two(d.hour)}:${two(d.minute)}';
+}
+
+void toast(BuildContext context, String msg, {bool error = false}) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(tx(msg), style: sans(size: 13, color: error ? C.pink : C.text)),
+    duration: const Duration(seconds: 3),
+  ));
 }
 
 // ------------------------------------------------------------------ header
@@ -38,11 +66,11 @@ class AppHeader extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Text('CVSAFE_101', style: mono(size: 11, color: C.orange, weight: FontWeight.w700)),
+                Text(tx('CVSAFE_101'), style: mono(size: 11, color: C.orange, weight: FontWeight.w700)),
                 const SizedBox(width: 6),
                 Pill('ISG-6331', color: C.muted, small: true),
               ]),
-              Text(title, style: sans(size: 21, weight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+              Text(tx(title), style: sans(size: 21, weight: FontWeight.w700), overflow: TextOverflow.ellipsis),
             ]),
           ),
           Container(
@@ -54,8 +82,8 @@ class AppHeader extends StatelessWidget {
               const SizedBox(width: 6),
               Flexible(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('SITE ZONE', style: mono(size: 9, color: C.muted)),
-                  Text((site?.name ?? '-').toUpperCase(),
+                  Text(tx('SITE ZONE'), style: mono(size: 9, color: C.muted)),
+                  Text(tx((site?.name ?? '-').toUpperCase()),
                       style: mono(size: 11, weight: FontWeight.w700), overflow: TextOverflow.ellipsis),
                 ]),
               ),
@@ -65,7 +93,7 @@ class AppHeader extends StatelessWidget {
           GestureDetector(
             onTap: () => showSettings(context),
             child: Stack(children: [
-              const CircleAvatar(radius: 17, backgroundColor: C.panel2, child: Icon(Icons.person, color: C.muted, size: 20)),
+              CircleAvatar(radius: 17, backgroundColor: C.panel2, child: Icon(Icons.person, color: C.muted, size: 20)),
               Positioned(
                 right: 0,
                 bottom: 0,
@@ -87,23 +115,228 @@ class AppHeader extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              st.online
+              tx(st.online
                   ? 'AI ONLINE · ${h?.streamsActive ?? 0} STREAMS · ${(h?.mode ?? '').toUpperCase()}'
                   : st.demo
                       ? 'OFFLINE · DEMO DATA'
-                      : 'CONNECTION LOST · LAST SYNC ${st.lastSync == null ? '-' : clock(st.lastSync!)}',
+                      : 'CONNECTION LOST · LAST SYNC ${st.lastSync == null ? '-' : clock(st.lastSync!)}'),
               style: mono(size: 10.5, color: C.muted, weight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Icon(Icons.speed, size: 14, color: C.blue),
+          Icon(Icons.speed, size: 14, color: C.blue),
           const SizedBox(width: 4),
-          Text(st.online ? '${(h?.latencyMs ?? 0).round()}ms LATENCY' : 'TAP AVATAR TO CONNECT',
+          Text(tx(st.online ? '${(h?.latencyMs ?? 0).round()}ms LATENCY' : 'TAP AVATAR TO CONNECT'),
               style: mono(size: 10.5, color: C.blue, weight: FontWeight.w600)),
         ]),
       ]),
     );
   }
+}
+
+// ----------------------------------------------------------------- pieces
+class Dot extends StatelessWidget {
+  const Dot({super.key, required this.color, this.size = 8});
+  final Color color;
+  final double size;
+  @override
+  Widget build(BuildContext context) =>
+      Container(width: size, height: size, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+}
+
+class Pill extends StatelessWidget {
+  const Pill(this.text, {super.key, required this.color, this.filled = false, this.small = false, this.icon});
+  final String text;
+  final Color color;
+  final bool filled;
+  final bool small;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: small ? 6 : 9, vertical: small ? 2 : 4),
+      decoration: BoxDecoration(
+        color: filled ? color : alpha(color, 0.14),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: alpha(color, filled ? 1 : 0.35)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (icon != null) ...[Icon(icon, size: small ? 11 : 13, color: filled ? Colors.white : color), const SizedBox(width: 4)],
+        Text(tx(text),
+            style: mono(size: small ? 9 : 10.5, color: filled ? Colors.white : color, weight: FontWeight.w700)),
+      ]),
+    );
+  }
+}
+
+class Panel extends StatelessWidget {
+  const Panel({super.key, required this.child, this.padding = const EdgeInsets.all(14), this.color, this.borderColor});
+  final Widget child;
+  final EdgeInsets padding;
+  final Color? color;
+  final Color? borderColor;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: padding,
+        decoration: BoxDecoration(
+          color: color ?? C.panel,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor ?? C.border),
+        ),
+        child: child,
+      );
+}
+
+class SectionTitle extends StatelessWidget {
+  const SectionTitle(this.text, {super.key, this.icon, this.trailing});
+  final String text;
+  final IconData? icon;
+  final Widget? trailing;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(children: [
+          if (icon != null) ...[Icon(icon, color: C.orange, size: 18), const SizedBox(width: 8)],
+          Expanded(child: Text(tx(text), style: sans(size: 16, weight: FontWeight.w700))),
+          if (trailing != null) trailing!,
+        ]),
+      );
+}
+
+class BigButton extends StatelessWidget {
+  const BigButton({super.key, required this.label, required this.onPressed, this.icon, this.color = C.orange,
+      this.textColor = Colors.white, this.outlined = false, this.busy = false});
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final Color color;
+  final Color textColor;
+  final bool outlined;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = busy
+        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: textColor))
+        : Row(mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [
+            if (icon != null) ...[Icon(icon, size: 18, color: outlined ? color : textColor), const SizedBox(width: 8)],
+            Flexible(
+              child: Text(tx(label),
+                  textAlign: TextAlign.center,
+                  style: mono(size: 13, weight: FontWeight.w700, color: outlined ? color : textColor)),
+            ),
+          ]);
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: outlined
+          ? OutlinedButton(
+              onPressed: busy ? null : onPressed,
+              style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: alpha(color, 0.5)),
+                  backgroundColor: alpha(color, 0.06),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              child: child)
+          : ElevatedButton(
+              onPressed: busy ? null : onPressed,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  disabledBackgroundColor: alpha(color, 0.4),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              child: child),
+    );
+  }
+}
+
+/// Network image with a placeholder for incidents that have no snapshot.
+class NetImage extends StatelessWidget {
+  const NetImage(this.url, {super.key, this.height = 200, this.fit = BoxFit.cover, this.radius = 10});
+  final String? url;
+  final double height;
+  final BoxFit fit;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget placeholder(String text, IconData icon) => Container(
+          height: height,
+          color: C.panel2,
+          alignment: Alignment.center,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, color: C.dim, size: 30),
+            const SizedBox(height: 6),
+            Text(tx(text), style: mono(size: 11, color: C.dim)),
+          ]),
+        );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: url == null
+          ? placeholder('NO SNAPSHOT STORED', Icons.image_not_supported_outlined)
+          : Image.network(
+              url!,
+              height: height,
+              width: double.infinity,
+              fit: fit,
+              gaplessPlayback: true,
+              loadingBuilder: (c, child, p) => p == null ? child : placeholder('LOADING...', Icons.hourglass_top),
+              errorBuilder: (c, e, s) => placeholder('IMAGE UNAVAILABLE', Icons.broken_image_outlined),
+            ),
+    );
+  }
+}
+
+class InfoRow extends StatelessWidget {
+  const InfoRow({super.key, required this.icon, required this.label, required this.value, this.sub, this.valueColor});
+  final IconData icon;
+  final String label;
+  final String value;
+  final String? sub;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: C.panel2, borderRadius: BorderRadius.circular(10)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 18, color: C.muted),
+          const SizedBox(width: 10),
+          SizedBox(width: 92, child: Text(tx(label), style: sans(size: 13, color: C.muted))),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(tx(value),
+                  textAlign: TextAlign.right,
+                  style: mono(size: 12.5, weight: FontWeight.w700, color: valueColor ?? C.text)),
+              if (sub != null)
+                Text(tx(sub!), textAlign: TextAlign.right, style: mono(size: 10, color: C.blue, weight: FontWeight.w600)),
+            ]),
+          ),
+        ]),
+      );
+}
+
+class EmptyState extends StatelessWidget {
+  const EmptyState({super.key, required this.icon, required this.title, this.text});
+  final IconData icon;
+  final String title;
+  final String? text;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+        child: Column(children: [
+          Icon(icon, size: 44, color: C.dim),
+          const SizedBox(height: 12),
+          Text(tx(title), style: sans(size: 16, weight: FontWeight.w600), textAlign: TextAlign.center),
+          if (text != null) ...[
+            const SizedBox(height: 6),
+            Text(tx(text!), style: sans(size: 13, color: C.muted), textAlign: TextAlign.center),
+          ],
+        ]),
+      );
 }
 
 class OfflineBanner extends StatelessWidget {
@@ -119,19 +352,65 @@ class OfflineBanner extends StatelessWidget {
         borderColor: alpha(C.yellow, 0.4),
         padding: const EdgeInsets.all(12),
         child: Row(children: [
-          const Icon(Icons.cloud_off, color: C.yellow, size: 20),
+          Icon(Icons.cloud_off, color: C.yellow, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-                st.demo
+                tx(st.demo
                     ? 'Server not reachable at ${st.serverUrl}. Showing demo data.'
-                    : 'Connection lost. Showing alerts from the last sync; retrying every 5 s.',
+                    : 'Connection lost. Showing alerts from the last sync; retrying every 5 s.'),
                 style: sans(size: 12.5, color: C.yellow)),
           ),
-          TextButton(onPressed: () => showSettings(context), child: Text('SET', style: mono(size: 12, color: C.orange))),
+          TextButton(onPressed: () => showSettings(context), child: Text(tx('SET'), style: mono(size: 12, color: C.orange))),
         ]),
       ),
     );
+  }
+}
+
+// ------------------------------------------------------ language & theme
+/// Language (TR / EN) and dark / light theme switches. Used on the login
+/// screen, in the web panel sidebar and in the mobile settings sheet.
+/// The whole app is rebuilt after a change, so [before] can close a sheet first.
+class UiToggles extends StatelessWidget {
+  const UiToggles({super.key, this.vertical = false, this.before});
+  final bool vertical;
+  final VoidCallback? before;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = UiPrefs.instance;
+    final lang = Tooltip(
+      message: tx('Switch language'),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          before?.call();
+          p.toggleLang();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+              color: C.panel2, borderRadius: BorderRadius.circular(8), border: Border.all(color: C.border)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(tx('TR'), style: mono(size: 11.5, weight: FontWeight.w800, color: p.isTurkish ? C.orange : C.muted)),
+            Text(tx(' / '), style: mono(size: 11.5, color: C.dim)),
+            Text(tx('EN'), style: mono(size: 11.5, weight: FontWeight.w800, color: p.isTurkish ? C.muted : C.orange)),
+          ]),
+        ),
+      ),
+    );
+    final theme = IconButton(
+      tooltip: tx(p.dark ? 'Light mode' : 'Dark mode'),
+      onPressed: () {
+        before?.call();
+        p.toggleDark();
+      },
+      icon: Icon(p.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, color: C.muted, size: 20),
+    );
+    return vertical
+        ? Column(mainAxisSize: MainAxisSize.min, children: [lang, const SizedBox(height: 4), theme])
+        : Row(mainAxisSize: MainAxisSize.min, children: [lang, const SizedBox(width: 4), theme]);
   }
 }
 
@@ -147,12 +426,12 @@ Future<void> showSettings(BuildContext context) {
     builder: (ctx) => Padding(
       padding: EdgeInsets.fromLTRB(18, 18, 18, MediaQuery.of(ctx).viewInsets.bottom + 24),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Server connection', style: sans(size: 18, weight: FontWeight.w700)),
+        Text(tx('Server connection'), style: sans(size: 18, weight: FontWeight.w700)),
         const SizedBox(height: 6),
         Text(
-            'Address of the CVSAFE AI server.\n'
+            tx('Address of the CVSAFE AI server.\n'
             '• Android emulator: http://10.0.2.2:8000\n'
-            '• Real phone: http://<computer LAN IP>:8000 (same Wi-Fi)',
+            '• Real phone: http://<computer LAN IP>:8000 (same Wi-Fi)'),
             style: sans(size: 12.5, color: C.muted, height: 1.4)),
         const SizedBox(height: 14),
         TextField(
@@ -162,13 +441,13 @@ Future<void> showSettings(BuildContext context) {
           decoration: InputDecoration(
             filled: true,
             fillColor: C.panel2,
-            hintText: 'http://192.168.1.20:8000',
+            hintText: tx('http://192.168.1.20:8000'),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
           ),
         ),
         const SizedBox(height: 14),
         BigButton(
-          label: 'Save & Connect',
+          label: tx('Save & Connect'),
           icon: Icons.link,
           onPressed: () async {
             Navigator.of(ctx).pop();
@@ -179,17 +458,26 @@ Future<void> showSettings(BuildContext context) {
             }
           },
         ),
+        const SizedBox(height: 18),
+        Divider(color: C.border),
+        const SizedBox(height: 4),
+        Row(children: [
+          Icon(Icons.palette_outlined, color: C.muted),
+          const SizedBox(width: 10),
+          Expanded(child: Text(tx('${tx('Language')} · ${tx('Theme')}'), style: sans(size: 14, weight: FontWeight.w600))),
+          UiToggles(before: () => Navigator.of(ctx).pop()),
+        ]),
         if (st.user != null) ...[
           const SizedBox(height: 18),
-          const Divider(color: C.border),
+          Divider(color: C.border),
           const SizedBox(height: 8),
           Row(children: [
-            const Icon(Icons.account_circle_outlined, color: C.muted),
+            Icon(Icons.account_circle_outlined, color: C.muted),
             const SizedBox(width: 10),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(st.user!.name, style: sans(size: 14, weight: FontWeight.w600)),
-                Text('${st.user!.username} · ${st.user!.roleLabel}', style: mono(size: 11, color: C.muted)),
+                Text(tx(st.user!.name), style: sans(size: 14, weight: FontWeight.w600)),
+                Text(tx('${st.user!.username} · ${st.user!.roleLabel}'), style: mono(size: 11, color: C.muted)),
               ]),
             ),
             TextButton.icon(
@@ -197,8 +485,8 @@ Future<void> showSettings(BuildContext context) {
                 Navigator.of(ctx).pop();
                 await st.logout();
               },
-              icon: const Icon(Icons.logout, color: C.pink, size: 18),
-              label: Text('Sign out', style: sans(size: 13, color: C.pink, weight: FontWeight.w600)),
+              icon: Icon(Icons.logout, color: C.pink, size: 18),
+              label: Text(tx('Sign out'), style: sans(size: 13, color: C.pink, weight: FontWeight.w600)),
             ),
           ]),
         ],

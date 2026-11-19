@@ -16,7 +16,7 @@ from .store import Store
 from .tracking import ViolationTracker
 
 MAX_SIDE = 1920
-PPE_TYPES = {"no_hardhat", "no_vest", "no_harness_at_height"}
+PPE_TYPES = {"no_hardhat", "no_vest", "no_harness_at_height", "no_gloves", "no_goggles", "no_boots", "no_mask"}
 
 
 class SafetyService:

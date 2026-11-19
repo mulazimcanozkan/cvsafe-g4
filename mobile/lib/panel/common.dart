@@ -1,5 +1,8 @@
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
+
+import '../models.dart';
+import '../theme.dart';
+import '../widgets.dart';
 
 /// Page frame used by every web-panel page: title row, actions, scrollable body.
 class PanelPage extends StatelessWidget {
@@ -19,8 +22,8 @@ class PanelPage extends StatelessWidget {
         spacing: 12,
         children: [
           Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(title, style: sans(size: 24, weight: FontWeight.w800)),
-            if (subtitle != null) Text(subtitle!, style: sans(size: 13, color: C.muted)),
+            Text(tx(title), style: sans(size: 24, weight: FontWeight.w800)),
+            if (subtitle != null) Text(tx(subtitle!), style: sans(size: 13, color: C.muted)),
           ]),
           Wrap(spacing: 8, runSpacing: 8, children: actions),
         ],
@@ -32,15 +35,17 @@ class PanelPage extends StatelessWidget {
 }
 
 class KpiCard extends StatelessWidget {
-  const KpiCard({super.key, required this.label, required this.value, this.sub, required this.icon, this.color = C.blue});
+  const KpiCard({super.key, required this.label, required this.value, this.sub, required this.icon, this.color});
   final String label;
   final String value;
   final String? sub;
   final IconData icon;
-  final Color color;
+  final Color? color;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
+  Widget build(BuildContext context) {
+    final color = this.color ?? C.blue;
+    return SizedBox(
         width: 230,
         child: Panel(
           child: Row(children: [
@@ -52,15 +57,16 @@ class KpiCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(label, style: mono(size: 10, color: C.muted, weight: FontWeight.w700)),
+                Text(tx(label), style: mono(size: 10, color: C.muted, weight: FontWeight.w700)),
                 const SizedBox(height: 2),
-                Text(value, style: mono(size: 22, weight: FontWeight.w800)),
-                if (sub != null) Text(sub!, style: sans(size: 11.5, color: C.muted), overflow: TextOverflow.ellipsis),
+                Text(tx(value), style: mono(size: 22, weight: FontWeight.w800)),
+                if (sub != null) Text(tx(sub!), style: sans(size: 11.5, color: C.muted), overflow: TextOverflow.ellipsis),
               ]),
             ),
           ]),
         ),
       );
+  }
 }
 
 /// Small dependency-free bar chart: violations per bucket, scanned workers as a faint bar behind.
@@ -72,7 +78,7 @@ class TrendChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (points.isEmpty) {
-      return SizedBox(height: height, child: Center(child: Text('No data yet', style: sans(size: 13, color: C.muted))));
+      return SizedBox(height: height, child: Center(child: Text(tx('No data yet'), style: sans(size: 13, color: C.muted))));
     }
     final maxV = points.map((p) => p.violations).fold<int>(1, (a, b) => a > b ? a : b);
     final maxS = points.map((p) => p.scanned).fold<int>(1, (a, b) => a > b ? a : b);
@@ -84,7 +90,7 @@ class TrendChart extends StatelessWidget {
           for (final p in points)
             Expanded(
               child: Tooltip(
-                message: '${p.label}\n${p.violations} violations · ${p.scanned} workers scanned',
+                message: tx('${p.label}\n${p.violations} violations · ${p.scanned} workers scanned'),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Stack(alignment: Alignment.bottomCenter, children: [
@@ -108,7 +114,7 @@ class TrendChart extends StatelessWidget {
       Row(children: [
         for (var i = 0; i < points.length; i++)
           Expanded(
-            child: Text(i % step == 0 ? points[i].label : '',
+            child: Text(tx(i % step == 0 ? points[i].label : ''),
                 textAlign: TextAlign.center, style: mono(size: 9.5, color: C.dim), overflow: TextOverflow.clip, maxLines: 1),
           ),
       ]),
@@ -116,11 +122,11 @@ class TrendChart extends StatelessWidget {
       Row(mainAxisAlignment: MainAxisAlignment.end, children: [
         Container(width: 10, height: 10, color: C.orange),
         const SizedBox(width: 6),
-        Text('Violations', style: sans(size: 11.5, color: C.muted)),
+        Text(tx('Violations'), style: sans(size: 11.5, color: C.muted)),
         const SizedBox(width: 14),
         Container(width: 10, height: 10, color: alpha(C.blue, 0.35)),
         const SizedBox(width: 6),
-        Text('Workers scanned', style: sans(size: 11.5, color: C.muted)),
+        Text(tx('Workers scanned'), style: sans(size: 11.5, color: C.muted)),
       ]),
     ]);
   }
@@ -139,7 +145,7 @@ class RangeChips extends StatelessWidget {
             selected: value == r.$1,
             onSelected: (_) => onChanged(r.$1),
             showCheckmark: false,
-            label: Text(r.$2, style: mono(size: 12, weight: FontWeight.w700, color: value == r.$1 ? Colors.white : C.text)),
+            label: Text(tx(r.$2), style: mono(size: 12, weight: FontWeight.w700, color: value == r.$1 ? Colors.white : C.text)),
             selectedColor: C.orange,
             backgroundColor: C.panel,
             side: BorderSide(color: value == r.$1 ? C.orange : C.border),
@@ -149,8 +155,8 @@ class RangeChips extends StatelessWidget {
 }
 
 InputDecoration fieldDecoration(String label, {String? hint, IconData? icon}) => InputDecoration(
-      labelText: label,
-      hintText: hint,
+      labelText: txn(label),
+      hintText: txn(hint),
       labelStyle: sans(size: 13, color: C.muted),
       hintStyle: sans(size: 13, color: C.dim),
       prefixIcon: icon == null ? null : Icon(icon, size: 19, color: C.muted),
@@ -164,13 +170,13 @@ Future<bool> confirmDialog(BuildContext context, String title, String message, {
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: C.panel,
-      title: Text(title, style: sans(size: 17, weight: FontWeight.w700)),
-      content: Text(message, style: sans(size: 13.5, color: C.muted)),
+      title: Text(tx(title), style: sans(size: 17, weight: FontWeight.w700)),
+      content: Text(tx(message), style: sans(size: 13.5, color: C.muted)),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tx('Cancel'))),
         TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(action, style: sans(size: 14, color: C.pink, weight: FontWeight.w600))),
+            child: Text(tx(action), style: sans(size: 14, color: C.pink, weight: FontWeight.w600))),
       ],
     ),
   );
@@ -190,7 +196,7 @@ class ActionButton extends StatelessWidget {
       ? ElevatedButton.icon(
           onPressed: onPressed,
           icon: Icon(icon, size: 18, color: Colors.white),
-          label: Text(label, style: mono(size: 12.5, weight: FontWeight.w700, color: Colors.white)),
+          label: Text(tx(label), style: mono(size: 12.5, weight: FontWeight.w700, color: Colors.white)),
           style: ElevatedButton.styleFrom(
               backgroundColor: C.orange,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -199,9 +205,9 @@ class ActionButton extends StatelessWidget {
       : OutlinedButton.icon(
           onPressed: onPressed,
           icon: Icon(icon, size: 18, color: C.text),
-          label: Text(label, style: mono(size: 12.5, weight: FontWeight.w700)),
+          label: Text(tx(label), style: mono(size: 12.5, weight: FontWeight.w700)),
           style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: C.border),
+              side: BorderSide(color: C.border),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
         );

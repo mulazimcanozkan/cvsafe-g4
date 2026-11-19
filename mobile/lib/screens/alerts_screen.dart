@@ -1,6 +1,7 @@
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 
+import '../models.dart';
+import '../theme.dart';
 import '../widgets.dart';
 
 /// Live alert feed for the field manager: acknowledge, act or mark false alarm.
@@ -63,9 +64,9 @@ class _AlertsScreenState extends State<AlertsScreen> {
             Dot(color: C.green, size: 10),
             const SizedBox(width: 8),
             Expanded(
-              child: Text('FIELD INTERVENTION MODE', style: mono(size: 11, color: C.green, weight: FontWeight.w700)),
+              child: Text(tx('FIELD INTERVENTION MODE'), style: mono(size: 11, color: C.green, weight: FontWeight.w700)),
             ),
-            Text(st.online ? 'Live alerts · 5s sync' : 'Demo', style: mono(size: 10, color: C.muted)),
+            Text(tx(st.online ? 'Live alerts · 5s sync' : 'Demo'), style: mono(size: 10, color: C.muted)),
             const SizedBox(width: 8),
             if (open.isNotEmpty) Pill('${open.length} ACTION REQ', color: C.red, filled: true, small: true),
           ]),
@@ -84,7 +85,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
                   Flexible(
-                    child: Text((st.site?.name ?? 'Site').toUpperCase(),
+                    child: Text(tx((st.site?.name ?? 'Site').toUpperCase()),
                         style: mono(size: 13, weight: FontWeight.w700), overflow: TextOverflow.ellipsis),
                   ),
                   const SizedBox(width: 6),
@@ -92,8 +93,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
                 ]),
                 const SizedBox(height: 3),
                 Text(
-                  '${st.criticalOpen} Critical · $warnings Warning'
-                  '${open.isNotEmpty ? ' · Last ${timeAgo(open.first.createdAt)}' : ''}',
+                  tx('${st.criticalOpen} Critical · $warnings Warning'
+                  '${open.isNotEmpty ? ' · Last ${timeAgo(open.first.createdAt)}' : ''}'),
                   style: mono(size: 11, color: C.muted),
                 ),
               ]),
@@ -112,7 +113,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   onSelected: (_) => setState(() => filter = f.$1),
                   showCheckmark: false,
                   avatar: Icon(f.$3, size: 14, color: filter == f.$1 ? Colors.white : (f.$1 == 'critical' ? C.red : C.muted)),
-                  label: Text('${f.$2} (${_count(all, f.$1)})',
+                  label: Text(tx('${f.$2} (${_count(all, f.$1)})'),
                       style: mono(size: 12, weight: FontWeight.w700, color: filter == f.$1 ? Colors.white : C.text)),
                   selectedColor: C.orange,
                   backgroundColor: C.panel,
@@ -188,20 +189,20 @@ class _AlertCardState extends State<AlertCard> {
                 Dot(color: inc.isOpen ? sev : C.dim),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('${inc.categoryLabel} #${inc.id}',
+                  child: Text(tx('${inc.categoryLabel} #${inc.id}'),
                       style: mono(size: 11, weight: FontWeight.w700), overflow: TextOverflow.ellipsis),
                 ),
                 if (inc.count > 1) ...[Pill('Aggregated (${inc.count}x)', color: C.blue, small: true), const SizedBox(width: 6)],
-                const Icon(Icons.schedule, size: 13, color: C.text),
+                Icon(Icons.schedule, size: 13, color: C.text),
                 const SizedBox(width: 4),
-                Text('${clock(inc.createdAt)} · ${timeAgo(inc.createdAt)}', style: mono(size: 10.5)),
+                Text(tx('${clock(inc.createdAt)} · ${timeAgo(inc.createdAt)}'), style: mono(size: 10.5)),
               ]),
             ),
             Padding(
               padding: const EdgeInsets.all(14),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: Text(inc.title, style: sans(size: 18, weight: FontWeight.w700, height: 1.2))),
+                  Expanded(child: Text(tx(inc.title), style: sans(size: 18, weight: FontWeight.w700, height: 1.2))),
                   const SizedBox(width: 8),
                   if (inc.isOpen)
                     Pill(inc.isCritical ? 'HIGH RISK' : inc.severity.toUpperCase(), color: sev)
@@ -211,16 +212,16 @@ class _AlertCardState extends State<AlertCard> {
                 ]),
                 const SizedBox(height: 6),
                 Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                  const Icon(Icons.videocam_outlined, size: 14, color: C.blue),
-                  Text('${inc.cameraId ?? 'UPLOAD'} · ${inc.zoneName ?? inc.cameraName ?? 'Field photo'}',
+                  Icon(Icons.videocam_outlined, size: 14, color: C.blue),
+                  Text(tx('${inc.cameraId ?? 'UPLOAD'} · ${inc.zoneName ?? inc.cameraName ?? 'Field photo'}'),
                       style: mono(size: 11, color: C.blue, weight: FontWeight.w600)),
                 ]),
                 if (inc.subcontractor != null) ...[
                   const SizedBox(height: 4),
                   Row(children: [
-                    const Icon(Icons.engineering_outlined, size: 14, color: C.muted),
+                    Icon(Icons.engineering_outlined, size: 14, color: C.muted),
                     const SizedBox(width: 6),
-                    Text(inc.subcontractor!, style: mono(size: 11, color: C.muted)),
+                    Text(tx(inc.subcontractor!), style: mono(size: 11, color: C.muted)),
                   ]),
                 ],
                 const SizedBox(height: 10),
@@ -247,7 +248,7 @@ class _AlertCardState extends State<AlertCard> {
                 if (inc.isOpen) ...[
                   const SizedBox(height: 14),
                   BigButton(
-                    label: 'Acknowledged / Addressed',
+                    label: tx('Acknowledged / Addressed'),
                     icon: Icons.check_circle_outline,
                     busy: busy,
                     onPressed: () => _run(() => st.acknowledge(inc), 'Marked as addressed'),
@@ -266,7 +267,7 @@ class _AlertCardState extends State<AlertCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: BigButton(
-                        label: 'False Alarm',
+                        label: tx('False Alarm'),
                         icon: Icons.cancel_outlined,
                         color: C.pink,
                         outlined: true,

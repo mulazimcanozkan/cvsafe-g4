@@ -1,6 +1,7 @@
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 
+import '../models.dart';
+import '../theme.dart';
 import '../widgets.dart';
 
 /// Evidence for one incident: annotated snapshot, field metadata, actions, timeline.
@@ -43,16 +44,16 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: C.panel,
-        title: Text('Mark as false alarm?', style: sans(size: 17, weight: FontWeight.w700)),
+        title: Text(tx('Mark as false alarm?'), style: sans(size: 17, weight: FontWeight.w700)),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('The snapshot is sent to the AI feedback loop to reduce similar mistakes.',
+          Text(tx('The snapshot is sent to the AI feedback loop to reduce similar mistakes.'),
               style: sans(size: 13, color: C.muted)),
           const SizedBox(height: 12),
           TextField(
             controller: ctrl,
             style: sans(size: 14),
             decoration: InputDecoration(
-              hintText: 'Reason (optional) e.g. helmet was worn',
+              hintText: tx('Reason (optional) e.g. helmet was worn'),
               filled: true,
               fillColor: C.panel2,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
@@ -60,10 +61,10 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
           ),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tx('Cancel'))),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Mark false alarm', style: sans(size: 14, color: C.pink, weight: FontWeight.w600))),
+              child: Text(tx('Mark false alarm'), style: sans(size: 14, color: C.pink, weight: FontWeight.w600))),
         ],
       ),
     );
@@ -78,12 +79,12 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
     final st = AppScope.of(context);
     final inc = st.selectedIncident;
     if (inc == null) {
-      return ListView(padding: const EdgeInsets.all(16), children: const [
+      return ListView(padding: const EdgeInsets.all(16), children: [
         OfflineBanner(),
         EmptyState(
             icon: Icons.verified_outlined,
-            title: 'No incident selected',
-            text: 'Open an alert, or scan a photo/video in AI Scan to create evidence.'),
+            title: tx('No incident selected'),
+            text: tx('Open an alert, or scan a photo/video in AI Scan to create evidence.')),
       ]);
     }
     final sev = severityColor(inc.severity);
@@ -103,19 +104,19 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
               icon: Icons.circle,
             ),
             const Spacer(),
-            const Icon(Icons.schedule, size: 14, color: C.yellow),
+            Icon(Icons.schedule, size: 14, color: C.yellow),
             const SizedBox(width: 4),
-            Text('${clock(inc.createdAt)} (${timeAgo(inc.createdAt)})',
+            Text(tx('${clock(inc.createdAt)} (${timeAgo(inc.createdAt)})'),
                 style: mono(size: 11, color: C.yellow, weight: FontWeight.w600)),
           ]),
           const SizedBox(height: 10),
-          Text(inc.title, style: sans(size: 21, weight: FontWeight.w800, height: 1.2)),
+          Text(tx(inc.title), style: sans(size: 21, weight: FontWeight.w800, height: 1.2)),
           const SizedBox(height: 8),
           Row(children: [
-            const Icon(Icons.videocam_outlined, size: 15, color: C.blue),
+            Icon(Icons.videocam_outlined, size: 15, color: C.blue),
             const SizedBox(width: 6),
             Expanded(
-              child: Text('${inc.cameraId ?? 'UPLOAD'}: ${inc.cameraName ?? 'Field photo/video'}',
+              child: Text(tx('${inc.cameraId ?? 'UPLOAD'}: ${inc.cameraName ?? 'Field photo/video'}'),
                   style: mono(size: 11.5, color: C.blue, weight: FontWeight.w600)),
             ),
           ]),
@@ -136,7 +137,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
           ),
         ),
         if (img != null)
-          const Positioned(top: 10, right: 10, child: Pill('KVKK FACE MASKED', color: C.green, small: true)),
+          Positioned(top: 10, right: 10, child: Pill('KVKK FACE MASKED', color: C.green, small: true)),
       ]),
       const SizedBox(height: 10),
       Panel(
@@ -151,30 +152,30 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.fact_check_outlined, color: C.blue, size: 18),
+            Icon(Icons.fact_check_outlined, color: C.blue, size: 18),
             const SizedBox(width: 8),
-            Expanded(child: Text('FIELD INCIDENT METADATA', style: mono(size: 12, color: C.blue, weight: FontWeight.w700))),
+            Expanded(child: Text(tx('FIELD INCIDENT METADATA'), style: mono(size: 12, color: C.blue, weight: FontWeight.w700))),
             Pill(st.online ? 'SYNCED' : (st.demo ? 'DEMO' : 'OFFLINE'), color: st.online ? C.green : C.yellow, small: true),
           ]),
           const SizedBox(height: 12),
-          InfoRow(icon: Icons.handshake_outlined, label: 'Subcontractor', value: inc.subcontractor ?? 'Unassigned'),
+          InfoRow(icon: Icons.handshake_outlined, label: tx('Subcontractor'), value: inc.subcontractor ?? 'Unassigned'),
           InfoRow(
               icon: Icons.place_outlined,
-              label: 'Zone / Location',
+              label: tx('Zone / Location'),
               value: inc.zoneName ?? inc.cameraName ?? 'Not in a defined zone',
               sub: inc.cameraId),
           InfoRow(
               icon: Icons.badge_outlined,
-              label: 'Worker / Tag',
+              label: tx('Worker / Tag'),
               value: inc.personIds.isEmpty ? '-' : inc.personIds.map((p) => 'Tracker #W-$p').join(', '),
               sub: inc.count > 1 ? '${inc.count} detections merged' : null),
           InfoRow(
               icon: Icons.gavel_outlined,
-              label: 'Legal Framework',
+              label: tx('Legal Framework'),
               value: inc.references.isEmpty ? '6331 s. ISG Kanunu' : inc.references.join('\n'),
               valueColor: C.orange,
               sub: 'Confirm article with OHS specialist'),
-          InfoRow(icon: Icons.memory_outlined, label: 'Source', value: inc.source.toUpperCase()),
+          InfoRow(icon: Icons.memory_outlined, label: tx('Source'), value: inc.source.toUpperCase()),
         ]),
       ),
       const SizedBox(height: 16),
@@ -182,7 +183,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
       SectionTitle('Field Intervention Actions', icon: Icons.bolt, trailing: Pill('REAL-TIME', color: C.muted, small: true)),
       if (inc.isOpen) ...[
         BigButton(
-          label: 'Acknowledged & Addressed',
+          label: tx('Acknowledged & Addressed'),
           icon: Icons.check_circle_outline,
           color: C.green,
           textColor: const Color(0xFF052E1C),
@@ -191,7 +192,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
         ),
         const SizedBox(height: 10),
         BigButton(
-          label: 'Mark as False Alarm (AI Feedback Loop)',
+          label: tx('Mark as False Alarm (AI Feedback Loop)'),
           icon: Icons.cancel_outlined,
           color: C.pink,
           outlined: true,
@@ -204,9 +205,9 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                  inc.status == 'false_alarm'
+                  tx(inc.status == 'false_alarm'
                       ? 'Marked as false alarm${inc.ackAt != null ? ' at ${clock(inc.ackAt!)}' : ''}'
-                      : 'Addressed${inc.ackAt != null ? ' at ${clock(inc.ackAt!)} · response ${((inc.ackAt! - inc.createdAt) / 60).toStringAsFixed(1)} min' : ''}',
+                      : 'Addressed${inc.ackAt != null ? ' at ${clock(inc.ackAt!)} · response ${((inc.ackAt! - inc.createdAt) / 60).toStringAsFixed(1)} min' : ''}'),
                   style: sans(size: 13.5)),
             ),
           ]),
@@ -218,19 +219,19 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: C.panel2, borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.radio, color: C.blue),
+            child: Icon(Icons.radio, color: C.blue),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Field Warden', style: mono(size: 13, weight: FontWeight.w700)),
-              Text('Radio dispatch to ${inc.zoneName ?? inc.cameraName ?? 'site'}', style: sans(size: 12, color: C.muted)),
+              Text(tx('Field Warden'), style: mono(size: 13, weight: FontWeight.w700)),
+              Text(tx('Radio dispatch to ${inc.zoneName ?? inc.cameraName ?? 'site'}'), style: sans(size: 12, color: C.muted)),
             ]),
           ),
           TextButton(
             onPressed: busy ? null : () => _run(() => st.fieldAction(inc, 'dispatch'), 'Warden dispatched'),
             style: TextButton.styleFrom(backgroundColor: alpha(C.blue, 0.15)),
-            child: Text('DISPATCH', style: mono(size: 11, color: C.blue, weight: FontWeight.w700)),
+            child: Text(tx('DISPATCH'), style: mono(size: 11, color: C.blue, weight: FontWeight.w700)),
           ),
         ]),
       ),
@@ -239,13 +240,13 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.history, size: 18, color: C.muted),
+            Icon(Icons.history, size: 18, color: C.muted),
             const SizedBox(width: 8),
-            Expanded(child: Text('RECENT INCIDENT TIMELINE', style: mono(size: 12, weight: FontWeight.w700))),
-            Text('LIVE LOG', style: mono(size: 10, color: C.muted)),
+            Expanded(child: Text(tx('RECENT INCIDENT TIMELINE'), style: mono(size: 12, weight: FontWeight.w700))),
+            Text(tx('LIVE LOG'), style: mono(size: 10, color: C.muted)),
           ]),
           const SizedBox(height: 12),
-          if (inc.timeline.isEmpty) Text('Loading timeline...', style: sans(size: 13, color: C.muted)),
+          if (inc.timeline.isEmpty) Text(tx('Loading timeline...'), style: sans(size: 13, color: C.muted)),
           for (var i = 0; i < inc.timeline.length; i++) _timelineRow(inc.timeline[i], i == inc.timeline.length - 1),
         ]),
       ),
@@ -253,10 +254,10 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
       Panel(
         padding: const EdgeInsets.all(12),
         child: Row(children: [
-          const Icon(Icons.laptop_mac, color: C.muted, size: 18),
+          Icon(Icons.laptop_mac, color: C.muted, size: 18),
           const SizedBox(width: 10),
           Expanded(
-            child: Text('Full Law 6331 dossiers & zone configuration are managed on the Desktop Web Portal',
+            child: Text(tx('Full Law 6331 dossiers & zone configuration are managed on the Desktop Web Portal'),
                 style: mono(size: 10.5, color: C.muted)),
           ),
         ]),
@@ -272,7 +273,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(icon, size: 16, color: active ? Colors.white : C.muted),
             const SizedBox(width: 6),
-            Text(label, style: mono(size: 11, weight: FontWeight.w700, color: active ? Colors.white : C.muted)),
+            Text(tx(label), style: mono(size: 11, weight: FontWeight.w700, color: active ? Colors.white : C.muted)),
           ]),
         ),
       );
@@ -303,12 +304,12 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
             padding: const EdgeInsets.only(bottom: 14),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Text(clock(e.ts), style: mono(size: 11, color: color, weight: FontWeight.w700)),
+                Text(tx(clock(e.ts)), style: mono(size: 11, color: color, weight: FontWeight.w700)),
                 const Spacer(),
-                Text(label, style: mono(size: 9.5, color: C.muted, weight: FontWeight.w700)),
+                Text(tx(label), style: mono(size: 9.5, color: C.muted, weight: FontWeight.w700)),
               ]),
               const SizedBox(height: 2),
-              Text(e.text, style: sans(size: 13)),
+              Text(tx(e.text), style: sans(size: 13)),
             ]),
           ),
         ),

@@ -1,20 +1,22 @@
 import 'dart:async';
 
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'login_screen.dart';
+import 'models.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/evidence_screen.dart';
 import 'screens/live_screen.dart';
 import 'screens/scan_screen.dart';
 import 'state.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await UiPrefs.instance.load(); // language + theme before the first frame
   final state = AppState();
   state.init();
   runApp(CvsafeApp(state: state));
@@ -28,11 +30,16 @@ class CvsafeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScope(
       state: state,
-      child: MaterialApp(
-        title: 'CVSAFE',
-        debugShowCheckedModeBanner: false,
-        theme: buildTheme(),
-        home: const _Root(),
+      // Rebuild everything when the language or theme changes.
+      child: ListenableBuilder(
+        listenable: UiPrefs.instance,
+        builder: (context, _) => MaterialApp(
+          key: ValueKey('${UiPrefs.instance.lang}-${UiPrefs.instance.dark}'),
+          title: tx('CVSAFE'),
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(),
+          home: const _Root(),
+        ),
       ),
     );
   }
@@ -86,19 +93,19 @@ class _HomeShellState extends State<HomeShell> {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(SnackBar(
       duration: const Duration(seconds: 6),
-      backgroundColor: inc.isCritical ? C.redDark : C.panel2,
+      backgroundColor: inc.isCritical ? C.redDark : C.snack,
       content: Row(children: [
         Icon(Icons.warning_amber_rounded, color: inc.isCritical ? Colors.white : C.orange),
         const SizedBox(width: 10),
         Expanded(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('NEW ${inc.severity.toUpperCase()} ALERT · ${inc.cameraId ?? 'UPLOAD'}',
+            Text(tx('NEW ${inc.severity.toUpperCase()} ALERT · ${inc.cameraId ?? 'UPLOAD'}'),
                 style: mono(size: 10.5, weight: FontWeight.w700, color: Colors.white)),
-            Text(inc.title, style: sans(size: 13.5, weight: FontWeight.w600, color: Colors.white)),
+            Text(tx(inc.title), style: sans(size: 13.5, weight: FontWeight.w600, color: Colors.white)),
           ]),
         ),
       ]),
-      action: SnackBarAction(label: 'VIEW', textColor: C.orange, onPressed: () => st.openEvidence(inc.id)),
+      action: SnackBarAction(label: tx('VIEW'), textColor: C.orange, onPressed: () => st.openEvidence(inc.id)),
     ));
   }
 
@@ -149,7 +156,7 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(color: C.bg, border: Border(top: BorderSide(color: C.border))),
+      decoration: BoxDecoration(color: C.bg, border: Border(top: BorderSide(color: C.border))),
       child: SafeArea(
         top: false,
         child: SizedBox(
@@ -169,12 +176,12 @@ class _BottomBar extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                             decoration: BoxDecoration(color: C.red, borderRadius: BorderRadius.circular(10)),
-                            child: Text('$alertCount', style: mono(size: 10, color: Colors.white, weight: FontWeight.w800)),
+                            child: Text(tx('$alertCount'), style: mono(size: 10, color: Colors.white, weight: FontWeight.w800)),
                           ),
                         ),
                     ]),
                     const SizedBox(height: 4),
-                    Text(_tabs[i].label,
+                    Text(tx(_tabs[i].label),
                         style: sans(size: 11, color: i == index ? C.orange : C.muted, weight: FontWeight.w600)),
                   ]),
                 ),

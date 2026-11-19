@@ -9,8 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cvsafe_core:
-    path: ../packages/cvsafe_core
   http: ^1.2.1
   image_picker: ^1.1.2
   shared_preferences: ^2.2.3

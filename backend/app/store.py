@@ -6,12 +6,7 @@ import sqlite3
 import threading
 import time
 
-from .rules import (DEFAULT_FALSE_ALARM_REASON, FALSE_ALARM_REASONS, STATUS_TRANSITIONS, VIOLATIONS,
-                    incident_severity, incident_title)
-
-
-class InvalidTransition(ValueError):
-    """Raised when an incident status change breaks the allowed flow (BR-02)."""
+from .rules import VIOLATIONS, incident_severity, incident_title
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS incidents (
@@ -60,20 +55,6 @@ CREATE INDEX IF NOT EXISTS idx_inc_created ON incidents(created_at);
 CREATE INDEX IF NOT EXISTS idx_scan_ts ON scans(ts);
 """
 
-# Columns added after the first prototype release; created on start-up for existing databases.
-MIGRATIONS = {
-    "incidents": {"false_alarm_reason": "TEXT"},
-}
-
-
-def ensure_columns(db, migrations):
-    """Add missing columns to existing tables (lightweight, idempotent schema migration)."""
-    for table, columns in migrations.items():
-        existing = {row[1] for row in db.execute(f"PRAGMA table_info({table})")}
-        for name, ddl in columns.items():
-            if name not in existing:
-                db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
-
 
 class Store:
     def __init__(self, path):
@@ -82,7 +63,6 @@ class Store:
         self.lock = threading.Lock()
         with self.lock:
             self.db.executescript(SCHEMA)
-            ensure_columns(self.db, MIGRATIONS)
             self.db.commit()
 
     # ---------------------------------------------------------------- writes
@@ -124,35 +104,18 @@ class Store:
             self._event(iid, now, "ai", "Repeat detection merged into this incident.")
             self.db.commit()
 
-    def set_status(self, iid, status, note=None, actor=None, reason=None):
-        """Change the status of an incident and append a timeline event in the same transaction.
-
-        Raises InvalidTransition if the change is not allowed by BR-02. A false alarm always
-        stores a reason code; ``reason`` defaults to "other" for older clients that send none.
-        """
+    def set_status(self, iid, status, note=None, actor=None):
         now = time.time()
-        if status == "false_alarm":
-            reason = reason or DEFAULT_FALSE_ALARM_REASON
-            if reason not in FALSE_ALARM_REASONS:
-                raise ValueError(f"Unknown false-alarm reason '{reason}'")
-        else:
-            reason = None
         with self.lock:
             row = self.db.execute("SELECT status FROM incidents WHERE id=?", (iid,)).fetchone()
             if not row:
                 return False
-            current = row["status"] or "open"
-            if status not in STATUS_TRANSITIONS.get(current, set()):
-                raise InvalidTransition(f"Incident is already '{current}' and cannot become '{status}'")
-            self.db.execute("UPDATE incidents SET status=?, ack_at=COALESCE(ack_at, ?), updated_at=?, "
-                            "false_alarm_reason=COALESCE(?, false_alarm_reason) WHERE id=?",
-                            (status, now, now, reason, iid))
+            self.db.execute("UPDATE incidents SET status=?, ack_at=COALESCE(ack_at, ?), updated_at=? WHERE id=?",
+                            (status, now, now, iid))
             text = {"acknowledged": "Acknowledged & addressed by field manager.",
                     "false_alarm": "Marked as false alarm (sent to AI feedback loop)."}.get(status, status)
             if actor:
                 text = text.replace("field manager", actor) if "field manager" in text else f"{text} ({actor})"
-            if reason:
-                text += f" Reason: {FALSE_ALARM_REASONS[reason]}."
             if note:
                 text += f" Note: {note}"
             self._event(iid, now, "user", text)

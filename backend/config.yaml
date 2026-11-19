@@ -64,6 +64,10 @@ detection:
   # Optional trained PPE model (see training/). If the file is missing the
   # service falls back to a colour-based baseline for hard hat / hi-vis vest.
   ppe_model: weights/ppe.pt
+  # harness_trained: true   # optional; detected automatically from the model if not set
+  # Small PPE that must be worn on this site (hard hat and vest are always required).
+  # Choose from: gloves, goggles, boots, mask. Items not listed are shown per worker but raise no alert.
+  required_ppe: []
   pose_model: weights/yolo11n-pose.pt
   object_model: weights/yolo11n.pt     # COCO: used for vehicles / machinery
   person_conf: 0.40

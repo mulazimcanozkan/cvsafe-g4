@@ -1,26 +1,24 @@
-import 'package:cvsafe_core/cvsafe_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
+import '../models.dart';
+import '../theme.dart';
+import '../widgets.dart';
 import 'common.dart';
-import 'incidents_page.dart';
-import 'state.dart';
 
-class DashboardPage extends ConsumerWidget {
-  const DashboardPage({super.key});
+class DashboardPage extends StatelessWidget {
+  const DashboardPage({super.key, required this.onOpenIncident, required this.onGoto});
+  final void Function(Incident) onOpenIncident;
+  final void Function(String page) onGoto;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final st = ref.watch(panelControllerProvider);
-    final ctrl = ref.read(panelControllerProvider.notifier);
+  Widget build(BuildContext context) {
+    final st = AppScope.of(context);
     final range = st.analyticsRange;
     final a = st.analytics[range];
     if (a == null && !st.analyticsLoading && st.analyticsError == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final cur = ref.read(panelControllerProvider);
-        if (cur.analytics[cur.analyticsRange] == null && !cur.analyticsLoading && cur.analyticsError == null) {
-          ctrl.loadAnalytics(cur.analyticsRange);
+        if (st.analytics[st.analyticsRange] == null && !st.analyticsLoading && st.analyticsError == null) {
+          st.loadAnalytics(st.analyticsRange);
         }
       });
     }
@@ -28,58 +26,54 @@ class DashboardPage extends ConsumerWidget {
     final cams = st.site?.cameras ?? const <Camera>[];
     final h = st.health;
     return PanelPage(
-      title: 'Dashboard',
-      subtitle: '${st.site?.name ?? ''} ${st.site?.block ?? ''} · live overview',
+      title: tx('Dashboard'),
+      subtitle: tx('${st.site?.name ?? ''} ${st.site?.block ?? ''} · live overview'),
       actions: [
-        RangeChips(value: range, onChanged: ctrl.loadAnalytics),
-        ActionButton(
-          label: 'Refresh',
-          icon: Icons.refresh,
-          onPressed: () {
-            ctrl.refresh();
-            ctrl.loadAnalytics(range);
-          },
-        ),
+        RangeChips(value: range, onChanged: st.loadAnalytics),
+        ActionButton(label: tx('Refresh'), icon: Icons.refresh, onPressed: () {
+          st.refresh();
+          st.loadAnalytics(range);
+        }),
       ],
       children: [
         if (a == null && st.analyticsError != null)
-          Panel(child: Text('Could not load analytics: ${st.analyticsError}', style: sans(size: 13, color: C.pink)))
+          Panel(child: Text(tx('Could not load analytics: ${st.analyticsError}'), style: sans(size: 13, color: C.pink)))
         else if (a == null)
           const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))
         else ...[
           Wrap(spacing: 12, runSpacing: 12, children: [
             KpiCard(
-                label: 'COMPLIANCE INDEX',
+                label: tx('COMPLIANCE INDEX'),
                 value: '${a.complianceIndex.round()} / 100',
                 sub: 'Grade ${a.grade} · ${a.risk}',
                 icon: Icons.verified_user_outlined,
                 color: a.complianceIndex >= 90 ? C.green : (a.complianceIndex >= 75 ? C.yellow : C.red)),
             KpiCard(
-                label: 'OPEN VIOLATIONS',
+                label: tx('OPEN VIOLATIONS'),
                 value: '${open.length}',
                 sub: '${st.criticalOpen} critical',
                 icon: Icons.warning_amber_rounded,
                 color: open.isEmpty ? C.green : C.red),
             KpiCard(
-                label: 'WORKERS SCANNED',
+                label: tx('WORKERS SCANNED'),
                 value: '${a.totalScanned}',
                 sub: '${a.violations} violations in period',
                 icon: Icons.center_focus_strong,
                 color: C.blue),
             KpiCard(
-                label: 'PPE RATE',
+                label: tx('PPE RATE'),
                 value: a.ppeRate == null ? '-' : '${a.ppeRate!.toStringAsFixed(1)}%',
                 sub: a.falseAlarmRate == null ? 'No feedback yet' : '${(a.falseAlarmRate! * 100).round()}% false alarms',
                 icon: Icons.health_and_safety_outlined,
                 color: C.green),
             KpiCard(
-                label: 'MEAN RESPONSE',
+                label: tx('MEAN RESPONSE'),
                 value: a.mttrSeconds == null ? '-' : '${a.mttrSeconds! ~/ 60}m ${a.mttrSeconds! % 60}s',
                 sub: 'Alert to acknowledge',
                 icon: Icons.timer_outlined,
                 color: C.yellow),
             KpiCard(
-                label: 'AI ENGINE',
+                label: tx('AI ENGINE'),
                 value: '${(h?.latencyMs ?? 0).round()} ms',
                 sub: '${h?.streamsActive ?? 0}/${h?.streamsTotal ?? 0} streams · ${h?.mode ?? '-'}',
                 icon: Icons.memory,
@@ -90,18 +84,18 @@ class DashboardPage extends ConsumerWidget {
             final wide = c.maxWidth > 1000;
             final trend = Panel(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const SectionTitle('Violations over time', icon: Icons.bar_chart),
+                SectionTitle('Violations over time', icon: Icons.bar_chart),
                 TrendChart(points: a.trend),
               ]),
             );
             final breakdown = Panel(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const SectionTitle('By violation type', icon: Icons.pie_chart_outline),
-                if (a.breakdown.isEmpty) Text('No violations in this period.', style: sans(size: 13, color: C.muted)),
+                SectionTitle('By violation type', icon: Icons.pie_chart_outline),
+                if (a.breakdown.isEmpty) Text(tx('No violations in this period.'), style: sans(size: 13, color: C.muted)),
                 for (final b in a.breakdown) _barRow(b.title, b.count, a.totalEvents, C.orange),
                 const SizedBox(height: 14),
-                const SectionTitle('By camera', icon: Icons.videocam_outlined),
-                if (a.byCamera.isEmpty) Text('No data.', style: sans(size: 13, color: C.muted)),
+                SectionTitle('By camera', icon: Icons.videocam_outlined),
+                if (a.byCamera.isEmpty) Text(tx('No data.'), style: sans(size: 13, color: C.muted)),
                 for (final b in a.byCamera) _barRow('${b.cameraId} · ${b.name}', b.count, a.violations, C.blue),
               ]),
             );
@@ -119,38 +113,36 @@ class DashboardPage extends ConsumerWidget {
           final wide = c.maxWidth > 1000;
           final openPanel = Panel(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SectionTitle('Open alerts',
-                  icon: Icons.notifications_active_outlined,
-                  trailing: TextButton(onPressed: () => context.go('/incidents'), child: const Text('View all'))),
-              if (open.isEmpty) Text('No open alerts. All zones compliant.', style: sans(size: 13, color: C.green)),
+              SectionTitle('Open alerts', icon: Icons.notifications_active_outlined,
+                  trailing: TextButton(onPressed: () => onGoto('incidents'), child: Text(tx('View all')))),
+              if (open.isEmpty) Text(tx('No open alerts. All zones compliant.'), style: sans(size: 13, color: C.green)),
               for (final i in open.take(6))
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  onTap: () => showIncidentDialog(context, i),
+                  onTap: () => onOpenIncident(i),
                   leading: Dot(color: severityColor(i.severity), size: 10),
-                  title: Text(i.title, style: sans(size: 13.5, weight: FontWeight.w600)),
-                  subtitle: Text('${i.cameraId ?? 'UPLOAD'} · ${i.zoneName ?? i.cameraName ?? ''} · ${timeAgo(i.createdAt)}',
+                  title: Text(tx(i.title), style: sans(size: 13.5, weight: FontWeight.w600)),
+                  subtitle: Text(tx('${i.cameraId ?? 'UPLOAD'} · ${i.zoneName ?? i.cameraName ?? ''} · ${timeAgo(i.createdAt)}'),
                       style: mono(size: 10.5, color: C.muted)),
-                  trailing: const Icon(Icons.chevron_right, color: C.muted),
+                  trailing: Icon(Icons.chevron_right, color: C.muted),
                 ),
             ]),
           );
           final camPanel = Panel(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SectionTitle('Cameras',
-                  icon: Icons.videocam_outlined,
-                  trailing: TextButton(onPressed: () => context.go('/cameras'), child: const Text('Manage'))),
+              SectionTitle('Cameras', icon: Icons.videocam_outlined,
+                  trailing: TextButton(onPressed: () => onGoto('cameras'), child: Text(tx('Manage')))),
               for (final cam in cams)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(cam.live ? Icons.videocam : Icons.videocam_off_outlined, color: cam.live ? C.green : C.dim),
-                  title: Text('${cam.id} · ${cam.name}', style: sans(size: 13.5, weight: FontWeight.w600)),
+                  title: Text(tx('${cam.id} · ${cam.name}'), style: sans(size: 13.5, weight: FontWeight.w600)),
                   subtitle: Text(
-                      '${cam.live ? 'LIVE · ${cam.fps.toStringAsFixed(1)} fps' : 'offline'} · ${cam.zones.length} zones · ${cam.subcontractor ?? 'no subcontractor'}',
+                      tx('${cam.live ? 'LIVE · ${cam.fps.toStringAsFixed(1)} fps' : 'offline'} · ${cam.zones.length} zones · ${cam.subcontractor ?? 'no subcontractor'}'),
                       style: mono(size: 10.5, color: C.muted)),
                   trailing: cam.openViolations > 0
                       ? Pill('${cam.openViolations} OPEN', color: C.red, small: true)
-                      : const Pill('OK', color: C.green, small: true),
+                      : Pill('OK', color: C.green, small: true),
                 ),
             ]),
           );
@@ -170,8 +162,8 @@ class DashboardPage extends ConsumerWidget {
         padding: const EdgeInsets.only(bottom: 10),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Expanded(child: Text(label, style: sans(size: 13), overflow: TextOverflow.ellipsis)),
-            Text('$count', style: mono(size: 12, weight: FontWeight.w700, color: color)),
+            Expanded(child: Text(tx(label), style: sans(size: 13), overflow: TextOverflow.ellipsis)),
+            Text(tx('$count'), style: mono(size: 12, weight: FontWeight.w700, color: color)),
           ]),
           const SizedBox(height: 4),
           ClipRRect(
